@@ -15,6 +15,7 @@
 # Implementation 
 * We use NodeJS 20.19 or better, we do not use typescript
 * We use VUE3 composition API with vite for the browser application
+* We make sure that the server ports are fixed and not dynamic
 
 # Application UI design
 * There is a narrow MCP log section on the left side
@@ -22,8 +23,9 @@
   * the clear display button removes currently displayed content
 * there are scrollbars for the log and the content section
 * new content is shown on top. 
+* We can remove old content when there are more than 100 content items displayed
 * each content card has an indicator for the type and time of the content display on the left of the card, and the actual content on the right, left-aligned
-* There is a favicon the shows a monitor
+* We create a favicon the shows a monitor
 
 # Documentation
 * We create an detailed README.md, including these sections:
@@ -38,6 +40,8 @@
   * We include tests that verify that content is actually displayed on the browser
 * We use jest for api tests
 * We implement unit tests where applicable
+* we make sure that the server can be launched without error
+* we create a test script that displays examples of the supported content types
 
 # Other Infornation
 * We use best practices for software design and project structure

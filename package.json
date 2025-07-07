@@ -1,0 +1,45 @@
+{
+  "name": "mcp-display-v2",
+  "version": "1.0.0",
+  "description": "MCP Display application with HTTP transport and Vue.js frontend",
+  "main": "server/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
+    "server:dev": "nodemon server/index.js",
+    "client:dev": "cd client && npm run dev",
+    "build": "cd client && npm run build",
+    "preview": "cd client && npm run preview",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "node --experimental-vm-modules node_modules/.bin/jest",
+    "test:e2e": "playwright test",
+    "test:demo": "node test-mcp-display.js",
+    "test:content": "playwright test tests/e2e/mcp-content-display.spec.js",
+    "install:all": "npm install && cd client && npm install"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.15.0",
+    "express": "^4.18.2",
+    "ws": "^8.14.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.2",
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "display",
+    "vue",
+    "nodejs"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.19.0"
+  }
+}
