@@ -82,6 +82,69 @@ Example MCP client configuration:
 }
 ```
 
+#### Claude Code Configuration
+
+To configure Claude Code to use this MCP server, add the following to your Claude Desktop configuration file:
+
+**Location of config file:**
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+**Configuration:**
+```json
+{
+  "mcpServers": {
+    "mcp-display": {
+      "command": "node",
+      "args": ["/path/to/mcp-display-v2/server/index.js"],
+      "env": {
+        "PORT": "3000",
+        "WS_PORT": "3001"
+      }
+    }
+  }
+}
+```
+
+**Note:** Replace `/path/to/mcp-display-v2` with the actual path to your installation directory.
+
+#### Gemini CLI Configuration
+
+To configure Gemini CLI to use this MCP server, you have several options:
+
+**Option 1: Using HTTP transport directly**
+```bash
+# Start the MCP display server first
+npm run dev
+
+# Then connect Gemini CLI with HTTP transport
+gemini-cli --mcp-server http://localhost:3000/mcp
+```
+
+**Option 2: Using configuration file**
+
+Create or edit your Gemini CLI configuration file with:
+```json
+{
+  "mcpServers": {
+    "display": {
+      "transport": "http",
+      "url": "http://localhost:3000/mcp"
+    }
+  }
+}
+```
+
+**Option 3: Using command line arguments**
+```bash
+gemini-cli --mcp-transport http --mcp-url http://localhost:3000/mcp
+```
+
+**Available Tools:**
+Once connected, both Claude Code and Gemini CLI will have access to these tools:
+- `display_text` - Display text content in the browser
+- `display_image` - Display base64-encoded images
+- `display_svg` - Display SVG graphics
+
 ## Software Structure
 
 ### Project Architecture

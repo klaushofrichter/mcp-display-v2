@@ -31,6 +31,7 @@
 * We create an detailed README.md, including these sections:
   * installation
   * configuration
+    * configuration of a MCP client, specifically "claude code" and "gemini cli"
   * software structure
   * test
 
