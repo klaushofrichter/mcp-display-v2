@@ -16,7 +16,10 @@
     "test:demo": "node test-mcp-display.js",
     "test:demo:auto": "node test-mcp-display.js",
     "test:content": "playwright test tests/e2e/mcp-content-display.spec.js",
-    "install:all": "npm install && cd client && npm install"
+    "install:all": "npm install && cd client && npm install",
+    "stop": "node scripts/stop-servers.js",
+    "stop:shell": "./scripts/stop-servers.sh",
+    "stop:force": "node scripts/stop-servers.js && sleep 2 && ./scripts/stop-servers.sh"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.15.0",

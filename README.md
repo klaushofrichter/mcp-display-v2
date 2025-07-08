@@ -47,6 +47,16 @@ This will start:
 - WebSocket server on `ws://localhost:3001`
 - Vue.js development server on `http://localhost:5173`
 
+Stop all servers:
+```bash
+npm run stop
+```
+
+For forceful shutdown (if processes don't terminate gracefully):
+```bash
+npm run stop:force
+```
+
 ### Production Build
 
 Build the client application:
@@ -84,28 +94,41 @@ Example MCP client configuration:
 
 #### Claude Code Configuration
 
-To configure Claude Code to use this MCP server, add the following to your Claude Desktop configuration file:
+Claude Code connects to MCP servers via HTTP transport. There are two ways to configure it:
+
+**Option 1: Using the built-in MCP management commands (Recommended)**
+
+First, start your MCP display server:
+```bash
+npm run dev
+```
+
+Then add the MCP server to Claude Code:
+```bash
+claude mcp add-json mcp-display '{"type":"http","url":"http://localhost:3000/mcp","description":"A MCP server that offers tools for display of text, image and SVG"}'
+```
+
+**Option 2: Using configuration file**
+
+Add the following to your Claude Code configuration file:
 
 **Location of config file:**
-- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- macOS: `~/.claude.json`
 
 **Configuration:**
 ```json
 {
   "mcpServers": {
     "mcp-display": {
-      "command": "node",
-      "args": ["/path/to/mcp-display-v2/server/index.js"],
-      "env": {
-        "PORT": "3000",
-        "WS_PORT": "3001"
-      }
+      "type": "http",
+      "url": "http://localhost:3000/mcp",
+      "description": "A MCP server that offers tools for display of text, image and SVG"
     }
   }
 }
 ```
 
-**Note:** Replace `/path/to/mcp-display-v2` with the actual path to your installation directory.
+**Important:** The MCP display server must be running (`npm run dev`) before connecting Claude Code.
 
 #### Gemini CLI Configuration
 
@@ -362,6 +385,51 @@ Access the web interface at `http://localhost:5173` during development or the co
 2. **WebSocket Connection Failed**: Ensure both servers are running
 3. **Content Not Displaying**: Check browser console for WebSocket errors
 4. **MCP Client Connection**: Verify endpoint URL and HTTP method
+5. **Servers Won't Stop**: Use the shutdown scripts to force termination
+6. **Claude Code "Internal error" (-32603)**: Make sure the MCP display server is running first with `npm run dev`
+
+### Server Shutdown Issues
+
+If you're experiencing issues with servers not shutting down properly (orphaned processes), use these commands:
+
+**Cross-platform shutdown (recommended):**
+```bash
+npm run stop
+```
+
+**Shell script shutdown (Unix/Linux/macOS only):**
+```bash
+npm run stop:shell
+```
+
+**Force shutdown (when processes are stuck):**
+```bash
+npm run stop:force
+```
+
+**Manual troubleshooting:**
+```bash
+# Check which processes are using the ports
+lsof -ti:3000 -ti:3001 -ti:5173
+
+# Kill specific processes by PID
+kill -TERM <PID>
+
+# Force kill if needed
+kill -KILL <PID>
+```
+
+### Port Status Check
+
+Check if ports are free before starting:
+```bash
+# Check individual ports
+lsof -ti:3000  # MCP HTTP Server
+lsof -ti:3001  # WebSocket Server  
+lsof -ti:5173  # Vue.js Dev Server
+
+# No output means the port is free
+```
 
 ### Logs
 

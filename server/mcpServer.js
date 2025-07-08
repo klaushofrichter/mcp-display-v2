@@ -40,6 +40,28 @@ export class McpServer {
     });
   }
 
+  /**
+   * Handle initialize request
+   */
+  async handleInitialize(params) {
+    console.log('MCP client initializing with params:', params);
+    
+    if (this.webSocketHandler) {
+      this.webSocketHandler.sendLog('MCP client initialization started');
+    }
+
+    return {
+      protocolVersion: '2024-11-05',
+      capabilities: {
+        tools: {},
+      },
+      serverInfo: {
+        name: 'mcp-display-server',
+        version: '1.0.0',
+      },
+    };
+  }
+
   async handleListTools() {
     return {
       tools: [
@@ -228,6 +250,21 @@ export class McpServer {
         // Route to appropriate handler based on method
         try {
           switch (request.method) {
+            case 'initialize':
+              response = await this.handleInitialize(request.params);
+              break;
+              
+            case 'initialized':
+              // This is a notification, no response needed
+              console.log('MCP client initialized successfully');
+              if (this.webSocketHandler) {
+                this.webSocketHandler.sendLog('MCP client connected and initialized');
+              }
+              return res.json({
+                jsonrpc: '2.0',
+                id: request.id
+              });
+              
             case 'tools/list':
               response = await this.handleListTools();
               break;

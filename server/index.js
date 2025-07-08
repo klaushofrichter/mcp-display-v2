@@ -54,22 +54,58 @@ server.listen(PORT, () => {
 });
 
 // Graceful shutdown
-process.on('SIGINT', () => {
-  console.log('\nShutting down servers...');
-  server.close(() => {
-    wsServer.close(() => {
+let shutdownInProgress = false;
+
+const gracefulShutdown = (signal) => {
+  if (shutdownInProgress) {
+    console.log('\nForce shutdown initiated...');
+    process.exit(1);
+  }
+  
+  shutdownInProgress = true;
+  console.log(`\nReceived ${signal}. Shutting down servers gracefully...`);
+  
+  // Set a timeout for forced shutdown
+  const forceShutdownTimeout = setTimeout(() => {
+    console.log('Force shutdown due to timeout');
+    process.exit(1);
+  }, 10000); // 10 seconds timeout
+  
+  // Close servers in sequence
+  server.close((err) => {
+    if (err) {
+      console.error('Error closing HTTP server:', err);
+    } else {
+      console.log('HTTP server closed');
+    }
+    
+    wsServer.close((err) => {
+      if (err) {
+        console.error('Error closing WebSocket server:', err);
+      } else {
+        console.log('WebSocket server closed');
+      }
+      
+      clearTimeout(forceShutdownTimeout);
       console.log('Servers shut down successfully');
       process.exit(0);
     });
   });
+  
+  // Close all existing connections
+  server.closeAllConnections?.();
+};
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  gracefulShutdown('uncaughtException');
 });
 
-process.on('SIGTERM', () => {
-  console.log('\nShutting down servers...');
-  server.close(() => {
-    wsServer.close(() => {
-      console.log('Servers shut down successfully');
-      process.exit(0);
-    });
-  });
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  gracefulShutdown('unhandledRejection');
 }); 

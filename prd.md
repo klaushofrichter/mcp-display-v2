@@ -10,12 +10,17 @@
   * SVG display: the MCP client provides an SVG object that is shown in the connected browser
 * There is a button on the screen that clears the window
 * There is a sidebar that shows a log of MCP client connections
-* We build a single page web application 
 
 # Implementation 
 * We use NodeJS 20.19 or better, we do not use typescript
+* We build a single page web application 
 * We use VUE3 composition API with vite for the browser application
 * We make sure that the server ports are fixed and not dynamic
+* We create a script that terminates the servers by terminating the processes that use the fixed ports
+* We implement commonly used MCP protocol elements, including these:
+  * /register
+  * /initialize
+* We implement a /health endpoint for all servers
 
 # Application UI design
 * There is a narrow MCP log section on the left side
@@ -31,7 +36,8 @@
 * We create an detailed README.md, including these sections:
   * installation
   * configuration
-    * configuration of a MCP client, specifically "claude code" and "gemini cli"
+    * configuration of the MCP server
+    * configuration of popular MCP clients, specifically "claude code" and "gemini cli"
   * software structure
   * test
 
@@ -49,6 +55,7 @@
 * We prefer readability of code over efficiency and performance
 * We use only well known 3rd party software packages, and use the latest stabke version
   * specifically, we use modelcontextprotocol/sdk 1.15.0 or better
+* We use the MIT licence
 * We do not edit the prd.md file
 * after completion of the project, re-read this prd.md and confirm that requirements are met
 * after completion of the project, run all tests
