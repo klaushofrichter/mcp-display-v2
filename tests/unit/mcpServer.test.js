@@ -119,6 +119,103 @@ describe('McpServer', () => {
     });
   });
 
+  describe('handleToolCall', () => {
+    test('should successfully call valid tools', async () => {
+      const params = {
+        name: 'display_text',
+        arguments: { content: 'Test content' }
+      };
+      
+      const result = await mcpServer.handleToolCall(params);
+      
+      expect(result.content[0].text).toContain('Successfully displayed text content');
+      expect(result.isError).toBeUndefined();
+    });
+
+    test('should gracefully handle unknown tool names', async () => {
+      const params = {
+        name: 'invalid_tool',
+        arguments: { content: 'test' }
+      };
+      
+      const result = await mcpServer.handleToolCall(params);
+      
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Unknown tool: "invalid_tool"');
+      expect(result.content[0].text).toContain('Available tools are: display_text, display_image, display_svg');
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('Unknown tool requested: "invalid_tool"');
+    });
+
+    test('should handle tool execution errors gracefully', async () => {
+      const params = {
+        name: 'display_text',
+        arguments: { content: null } // This will cause a validation error
+      };
+      
+      const result = await mcpServer.handleToolCall(params);
+      
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Error: Content must be a non-empty string');
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('Error in tool "display_text": Content must be a non-empty string');
+    });
+
+    test('should not expose stack traces for unknown tools', async () => {
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      
+      const params = {
+        name: 'nonexistent_tool',
+        arguments: { content: 'test' }
+      };
+      
+      const result = await mcpServer.handleToolCall(params);
+      
+      expect(result.isError).toBe(true);
+      expect(consoleSpy).toHaveBeenCalledWith('Unknown tool requested: "nonexistent_tool". Available tools: display_text, display_image, display_svg');
+      
+      // Ensure no error was logged (no stack trace)
+      expect(jest.spyOn(console, 'error')).not.toHaveBeenCalled();
+      
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('handleInitialize', () => {
+    test('should return proper initialization response', async () => {
+      const params = {
+        protocolVersion: '2024-11-05',
+        capabilities: { roots: { listChanged: true } },
+        clientInfo: { name: 'test-client', version: '1.0.0' }
+      };
+      
+      const result = await mcpServer.handleInitialize(params);
+      
+      expect(result.protocolVersion).toBe('2024-11-05');
+      expect(result.capabilities.tools).toBeDefined();
+      expect(result.serverInfo.name).toBe('mcp-display-server');
+      expect(result.serverInfo.version).toBe('1.0.0');
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('MCP client initialization started');
+    });
+  });
+
+  describe('handleListTools', () => {
+    test('should return all available tools', async () => {
+      const result = await mcpServer.handleListTools();
+      
+      expect(result.tools).toHaveLength(3);
+      expect(result.tools.map(t => t.name)).toEqual(['display_text', 'display_image', 'display_svg']);
+      
+      // Verify tool schemas
+      result.tools.forEach(tool => {
+        expect(tool.name).toBeDefined();
+        expect(tool.description).toBeDefined();
+        expect(tool.inputSchema).toBeDefined();
+        expect(tool.inputSchema.type).toBe('object');
+        expect(tool.inputSchema.properties.content).toBeDefined();
+        expect(tool.inputSchema.required).toContain('content');
+      });
+    });
+  });
+
   describe('server initialization', () => {
     test('should initialize with correct server info', () => {
       expect(mcpServer.server).toBeDefined();

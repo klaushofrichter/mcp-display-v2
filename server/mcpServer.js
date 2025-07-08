@@ -114,6 +114,26 @@ export class McpServer {
   async handleToolCall(params) {
     const { name, arguments: args } = params;
 
+    // Check for unknown tool names first (before try-catch to avoid stack traces)
+    const validTools = ['display_text', 'display_image', 'display_svg'];
+    if (!validTools.includes(name)) {
+      console.log(`Unknown tool requested: "${name}". Available tools: ${validTools.join(', ')}`);
+      
+      if (this.webSocketHandler) {
+        this.webSocketHandler.sendLog(`Unknown tool requested: "${name}"`);
+      }
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Unknown tool: "${name}". Available tools are: ${validTools.join(', ')}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
     try {
       switch (name) {
         case 'display_text':
@@ -122,11 +142,15 @@ export class McpServer {
           return await this.handleImageDisplay(args);
         case 'display_svg':
           return await this.handleSvgDisplay(args);
-        default:
-          throw new Error(`Unknown tool: ${name}`);
       }
     } catch (error) {
-      console.error(`Error handling tool ${name}:`, error);
+      // Log actual errors (validation, processing, etc.) with more detail for debugging
+      console.error(`Error handling tool "${name}":`, error.message);
+      
+      if (this.webSocketHandler) {
+        this.webSocketHandler.sendLog(`Error in tool "${name}": ${error.message}`);
+      }
+      
       return {
         content: [
           {
@@ -247,6 +271,26 @@ export class McpServer {
 
         let response;
         
+        // Check for unknown methods first (before try-catch to avoid stack traces)
+        const validMethods = ['initialize', 'initialized', 'tools/list', 'tools/call'];
+        if (!validMethods.includes(request.method)) {
+          console.log(`Unknown MCP method requested: "${request.method}". Available methods: ${validMethods.join(', ')}`);
+          
+          if (this.webSocketHandler) {
+            this.webSocketHandler.sendLog(`Unknown MCP method: "${request.method}"`);
+          }
+          
+          return res.json({
+            jsonrpc: '2.0',
+            id: request.id,
+            error: {
+              code: -32601,
+              message: 'Method not found',
+              data: `Unknown method: "${request.method}". Available methods: ${validMethods.join(', ')}`
+            }
+          });
+        }
+
         // Route to appropriate handler based on method
         try {
           switch (request.method) {
@@ -272,9 +316,6 @@ export class McpServer {
             case 'tools/call':
               response = await this.handleToolCall(request.params);
               break;
-              
-            default:
-              throw new Error(`Unknown method: ${request.method}`);
           }
           
           res.json({
@@ -284,7 +325,13 @@ export class McpServer {
           });
           
         } catch (error) {
-          console.error(`MCP method error (${request.method}):`, error);
+          // Log actual processing errors (not unknown methods)
+          console.error(`MCP method error (${request.method}):`, error.message);
+          
+          if (this.webSocketHandler) {
+            this.webSocketHandler.sendLog(`Error in method "${request.method}": ${error.message}`);
+          }
+          
           res.json({
             jsonrpc: '2.0',
             id: request.id,
