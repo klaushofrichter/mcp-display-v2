@@ -49,3 +49,5 @@
 * We use only well known 3rd party software packages, and use the latest stabke version
   * specifically, we use modelcontextprotocol/sdk 1.15.0 or better
 * We do not edit the prd.md file
+* after completion of the project, re-read this prd.md and confirm that requirements are met
+* after completion of the project, run all tests

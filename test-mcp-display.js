@@ -99,13 +99,12 @@ async function testDisplay(contentType, toolName, content, description) {
   }
 
   console.log(`\n${colors.yellow}   👀 Check the web interface at ${WEB_INTERFACE} to see the content${colors.reset}`);
-  console.log(`${colors.yellow}   Press Enter to continue to the next test...${colors.reset}`);
   
-  // Wait for user input
+  // Wait 2 seconds before continuing to next test
   return new Promise((resolve) => {
-    process.stdin.once('data', () => {
+    setTimeout(() => {
       resolve(true);
-    });
+    }, 2000);
   });
 }
 
@@ -129,11 +128,11 @@ async function main() {
   console.log('2. Image display (using water.png)');
   console.log('3. SVG display (using custom favicon)\n');
   console.log(`${colors.yellow}Make sure to have the web interface open at ${WEB_INTERFACE}${colors.reset}\n`);
-  console.log('Press Enter to start the tests...');
+  console.log('Starting tests automatically in 3 seconds...\n');
 
-  // Wait for user input to start
+  // Wait 3 seconds before starting
   await new Promise((resolve) => {
-    process.stdin.once('data', resolve);
+    setTimeout(resolve, 3000);
   });
 
   // Check if server is running
