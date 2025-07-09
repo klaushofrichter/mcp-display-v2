@@ -107,6 +107,20 @@ export class McpServer {
             required: ['content'],
           },
         },
+        {
+          name: 'display_image_url',
+          description: 'Display an image from a URL in the browser',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              url: {
+                type: 'string',
+                description: 'URL of the image to display (supports common image formats: JPEG, PNG, GIF, WebP)',
+              },
+            },
+            required: ['url'],
+          },
+        },
       ],
     };
   }
@@ -115,7 +129,7 @@ export class McpServer {
     const { name, arguments: args } = params;
 
     // Check for unknown tool names first (before try-catch to avoid stack traces)
-    const validTools = ['display_text', 'display_image', 'display_svg'];
+    const validTools = ['display_text', 'display_image', 'display_svg', 'display_image_url'];
     if (!validTools.includes(name)) {
       console.log(`Unknown tool requested: "${name}". Available tools: ${validTools.join(', ')}`);
       
@@ -142,6 +156,8 @@ export class McpServer {
           return await this.handleImageDisplay(args);
         case 'display_svg':
           return await this.handleSvgDisplay(args);
+        case 'display_image_url':
+          return await this.handleImageUrlDisplay(args);
       }
     } catch (error) {
       // Log actual errors (validation, processing, etc.) with more detail for debugging
@@ -246,6 +262,70 @@ export class McpServer {
         },
       ],
     };
+  }
+
+  async handleImageUrlDisplay(args) {
+    const { url } = args;
+    
+    if (!url || typeof url !== 'string') {
+      throw new Error('URL must be a non-empty string');
+    }
+
+    // Basic URL validation
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(url);
+    } catch (error) {
+      throw new Error('Invalid URL format');
+    }
+
+    // Only allow http and https protocols for security
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      throw new Error('URL must use HTTP or HTTPS protocol');
+    }
+
+    // Fetch the image from the URL
+    try {
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+      }
+
+      // Check if the response is an image
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.startsWith('image/')) {
+        throw new Error('URL does not point to an image resource');
+      }
+
+      // Convert to buffer and then to base64
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const base64Data = buffer.toString('base64');
+      const dataUri = `data:${contentType};base64,${base64Data}`;
+
+      // Send content to browser via WebSocket
+      if (this.webSocketHandler) {
+        this.webSocketHandler.sendContent('image-url', dataUri);
+        this.webSocketHandler.sendLog(`Image from URL displayed: ${url}`);
+      }
+
+      console.log(`Displayed image from URL: ${url}`);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Successfully displayed image from URL: ${url}`,
+          },
+        ],
+      };
+    } catch (error) {
+      if (error.message.includes('fetch')) {
+        throw new Error(`Failed to fetch image from URL: ${error.message}`);
+      }
+      throw error;
+    }
   }
 
   /**
@@ -367,6 +447,7 @@ export class McpServer {
             display_text: 'Display ASCII text content',
             display_image: 'Display base64-encoded images',
             display_svg: 'Display SVG content',
+            display_image_url: 'Display images from URLs',
           },
         },
         endpoints: {

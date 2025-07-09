@@ -110,6 +110,97 @@ describe('McpServer', () => {
     });
   });
 
+  describe('handleImageUrlDisplay', () => {
+    // Mock fetch for testing
+    global.fetch = jest.fn();
+
+    beforeEach(() => {
+      fetch.mockClear();
+    });
+
+    test('should successfully display image from URL', async () => {
+      const mockImageBuffer = Buffer.from('fake-image-data');
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        headers: {
+          get: jest.fn().mockReturnValue('image/png')
+        },
+        arrayBuffer: jest.fn().mockResolvedValue(mockImageBuffer.buffer)
+      };
+      
+      fetch.mockResolvedValue(mockResponse);
+      
+      const args = { url: 'https://example.com/image.png' };
+      const result = await mcpServer.handleImageUrlDisplay(args);
+      
+      expect(result.content[0].text).toBe('Successfully displayed image from URL: https://example.com/image.png');
+      expect(fetch).toHaveBeenCalledWith('https://example.com/image.png');
+      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('image-url', expect.stringContaining('data:image/png;base64,'));
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('Image from URL displayed: https://example.com/image.png');
+    });
+
+    test('should throw error for invalid URL', async () => {
+      const args = { url: 'invalid-url' };
+      
+      await expect(mcpServer.handleImageUrlDisplay(args))
+        .rejects.toThrow('Invalid URL format');
+    });
+
+    test('should throw error for non-HTTP protocols', async () => {
+      const args = { url: 'ftp://example.com/image.png' };
+      
+      await expect(mcpServer.handleImageUrlDisplay(args))
+        .rejects.toThrow('URL must use HTTP or HTTPS protocol');
+    });
+
+    test('should throw error for fetch failure', async () => {
+      const mockResponse = {
+        ok: false,
+        status: 404,
+        statusText: 'Not Found'
+      };
+      
+      fetch.mockResolvedValue(mockResponse);
+      
+      const args = { url: 'https://example.com/nonexistent.png' };
+      
+      await expect(mcpServer.handleImageUrlDisplay(args))
+        .rejects.toThrow('Failed to fetch image: 404 Not Found');
+    });
+
+    test('should throw error for non-image content', async () => {
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        headers: {
+          get: jest.fn().mockReturnValue('text/html')
+        }
+      };
+      
+      fetch.mockResolvedValue(mockResponse);
+      
+      const args = { url: 'https://example.com/page.html' };
+      
+      await expect(mcpServer.handleImageUrlDisplay(args))
+        .rejects.toThrow('URL does not point to an image resource');
+    });
+
+    test('should throw error for empty URL', async () => {
+      const args = { url: '' };
+      
+      await expect(mcpServer.handleImageUrlDisplay(args))
+        .rejects.toThrow('URL must be a non-empty string');
+    });
+
+    test('should throw error for missing URL', async () => {
+      const args = {};
+      
+      await expect(mcpServer.handleImageUrlDisplay(args))
+        .rejects.toThrow('URL must be a non-empty string');
+    });
+  });
+
   describe('setWebSocketHandler', () => {
     test('should set WebSocket handler correctly', () => {
       const newHandler = { test: true };
@@ -142,7 +233,7 @@ describe('McpServer', () => {
       
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Unknown tool: "invalid_tool"');
-      expect(result.content[0].text).toContain('Available tools are: display_text, display_image, display_svg');
+      expect(result.content[0].text).toContain('Available tools are: display_text, display_image, display_svg, display_image_url');
       expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('Unknown tool requested: "invalid_tool"');
     });
 
@@ -170,7 +261,7 @@ describe('McpServer', () => {
       const result = await mcpServer.handleToolCall(params);
       
       expect(result.isError).toBe(true);
-      expect(consoleSpy).toHaveBeenCalledWith('Unknown tool requested: "nonexistent_tool". Available tools: display_text, display_image, display_svg');
+      expect(consoleSpy).toHaveBeenCalledWith('Unknown tool requested: "nonexistent_tool". Available tools: display_text, display_image, display_svg, display_image_url');
       
       // Ensure no error was logged (no stack trace)
       expect(jest.spyOn(console, 'error')).not.toHaveBeenCalled();
@@ -201,8 +292,8 @@ describe('McpServer', () => {
     test('should return all available tools', async () => {
       const result = await mcpServer.handleListTools();
       
-      expect(result.tools).toHaveLength(3);
-      expect(result.tools.map(t => t.name)).toEqual(['display_text', 'display_image', 'display_svg']);
+      expect(result.tools).toHaveLength(4);
+      expect(result.tools.map(t => t.name)).toEqual(['display_text', 'display_image', 'display_svg', 'display_image_url']);
       
       // Verify tool schemas
       result.tools.forEach(tool => {
@@ -210,8 +301,18 @@ describe('McpServer', () => {
         expect(tool.description).toBeDefined();
         expect(tool.inputSchema).toBeDefined();
         expect(tool.inputSchema.type).toBe('object');
-        expect(tool.inputSchema.properties.content).toBeDefined();
-        expect(tool.inputSchema.required).toContain('content');
+        expect(tool.inputSchema.properties).toBeDefined();
+        expect(tool.inputSchema.required).toBeDefined();
+        expect(tool.inputSchema.required.length).toBeGreaterThan(0);
+        
+        // Verify the correct property exists for each tool
+        if (tool.name === 'display_image_url') {
+          expect(tool.inputSchema.properties.url).toBeDefined();
+          expect(tool.inputSchema.required).toContain('url');
+        } else {
+          expect(tool.inputSchema.properties.content).toBeDefined();
+          expect(tool.inputSchema.required).toContain('content');
+        }
       });
     });
   });

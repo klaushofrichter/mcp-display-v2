@@ -68,6 +68,27 @@ test.describe('MCP Display Application', () => {
     await expect(logEntry.locator('.log-time')).toBeVisible();
     await expect(logEntry.locator('.log-message')).toBeVisible();
   });
+
+  test('should have clear logs button that clears logs', async ({ page }) => {
+    // Check that clear logs button is visible in sidebar
+    const clearLogsButton = page.locator('.clear-logs-button');
+    await expect(clearLogsButton).toBeVisible();
+    await expect(clearLogsButton).toHaveText('Clear Logs');
+    
+    // Wait for WebSocket connection log entry
+    await expect(page.locator('.log-entry').first()).toBeVisible({ timeout: 5000 });
+    
+    // Check that there are log entries initially
+    const logEntriesBefore = await page.locator('.log-entry').count();
+    expect(logEntriesBefore).toBeGreaterThan(0);
+    
+    // Click the clear logs button
+    await clearLogsButton.click();
+    
+    // Check that log entries are cleared
+    const logEntriesAfter = await page.locator('.log-entry').count();
+    expect(logEntriesAfter).toBe(0);
+  });
 });
 
 test.describe('MCP Display Content Simulation', () => {

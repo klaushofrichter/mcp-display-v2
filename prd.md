@@ -8,6 +8,7 @@
   * Text display: the MCP client provides simple ASCII text that is then shown in a conected browser
   * Image display: the MCP client provides base64 encoded image data that is then shown in the connected browser
   * SVG display: the MCP client provides an SVG object that is shown in the connected browser
+  * Image URL display: the MCP client provides a URL to an image that is shown in the connected browser
 * There is a button on the screen that clears the window
 * There is a sidebar that shows a log of MCP client connections
 
@@ -24,11 +25,13 @@
 
 # Application UI design
 * There is a narrow MCP log section on the left side
+  * there is a button "clear log" that removes all logs (but keeps the content)
+  * there is a limit of 200 log entries. After that older logs are removed
 * There is a wide content display section on the right side, with a "clear display" button 
-  * the clear display button removes currently displayed content
+  * the clear display button removes currently displayed content (but keeps the log)
+  * We can remove old content when there are more than 100 content items displayed
 * there are scrollbars for the log and the content section
 * new content is shown on top. 
-* We can remove old content when there are more than 100 content items displayed
 * each content card has an indicator for the type and time of the content display on the left of the card, and the actual content on the right, left-aligned
 * We create a favicon the shows a monitor
 

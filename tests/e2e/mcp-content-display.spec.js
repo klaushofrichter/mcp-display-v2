@@ -110,12 +110,13 @@ test.describe('MCP Content Display Integration Tests', () => {
     
     expect(response.result).toBeDefined();
     expect(response.result.tools).toBeDefined();
-    expect(response.result.tools).toHaveLength(3);
+    expect(response.result.tools).toHaveLength(4);
     
     const toolNames = response.result.tools.map(tool => tool.name);
     expect(toolNames).toContain('display_text');
     expect(toolNames).toContain('display_image');
     expect(toolNames).toContain('display_svg');
+    expect(toolNames).toContain('display_image_url');
   });
 
   test('should display text content correctly', async ({ page, request }) => {
@@ -148,7 +149,7 @@ Status: All systems operational`;
     
     // Verify content type and structure
     const contentItem = page.locator('.content-card').first();
-    await expect(contentItem.locator('.content-type')).toContainText('text');
+    await expect(contentItem.locator('.content-type')).toContainText('Text');
     
     // Verify the actual text content is displayed
     const textDisplay = contentItem.locator('.text-content');
@@ -197,7 +198,7 @@ Status: All systems operational`;
     
     // Verify content type and structure
     const contentItem = page.locator('.content-card').first();
-    await expect(contentItem.locator('.content-type')).toContainText('image');
+    await expect(contentItem.locator('.content-type')).toContainText('Image');
     
     // Verify the actual image is displayed
     const imageDisplay = contentItem.locator('.image-content img');
@@ -246,7 +247,7 @@ Status: All systems operational`;
     
     // Verify content type and structure
     const contentItem = page.locator('.content-card').first();
-    await expect(contentItem.locator('.content-type')).toContainText('svg');
+    await expect(contentItem.locator('.content-type')).toContainText('SVG');
     
     // Verify the actual SVG is displayed
     const svgDisplay = contentItem.locator('.svg-content');
@@ -275,6 +276,76 @@ Status: All systems operational`;
     expect(newLogCount).toBeGreaterThanOrEqual(initialLogCount);
     await expect(
       page.locator('.log-entry').filter({ hasText: /Displayed SVG content|svg content/ })
+    ).toBeVisible();
+  });
+
+  test('should display image from URL correctly', async ({ page, request }) => {
+    // Use a reliable test image URL
+    const imageUrl = 'https://httpbin.org/image/png';
+    
+    // Count initial log entries
+    const initialLogCount = await page.locator('.log-entry').count();
+    
+    // Make MCP request to display image from URL
+    const response = await makeMcpRequest(request, 'tools/call', 'display_image_url', '', 1);
+    
+    // Override the content parameter with url parameter for this tool
+    const customRequest = {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: {
+        name: 'display_image_url',
+        arguments: {
+          url: imageUrl
+        }
+      }
+    };
+    
+    const urlResponse = await request.post('http://localhost:3000/mcp', {
+      data: customRequest,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const urlResult = await urlResponse.json();
+    
+    // Verify MCP response is successful
+    expect(urlResult.result).toBeDefined();
+    expect(urlResult.result.content[0].text).toContain(`Successfully displayed image from URL: ${imageUrl}`);
+    
+    // Wait for content to appear in the browser
+    await expect(page.locator('.content-card')).toBeVisible({ timeout: 10000 });
+    
+    // Verify content type and structure
+    const contentItem = page.locator('.content-card').first();
+    await expect(contentItem.locator('.content-type')).toContainText('Image-URL');
+    
+    // Verify the actual image is displayed
+    const imageDisplay = contentItem.locator('.image-content img');
+    await expect(imageDisplay).toBeVisible();
+    
+    // Verify image has a valid data URI src (should be base64 converted)
+    const imgSrc = await imageDisplay.getAttribute('src');
+    expect(imgSrc).toMatch(/^data:image\/(png|jpeg|jpg);base64,/);
+    expect(imgSrc.length).toBeGreaterThan(100); // Should be substantial base64 content
+    
+    // Verify image properties (alt text includes timestamp)
+    const altText = await imageDisplay.getAttribute('alt');
+    expect(altText).toContain('Image content from');
+    
+    // Wait for image to load and check dimensions
+    await imageDisplay.waitFor({ state: 'visible' });
+    const imageBounds = await imageDisplay.boundingBox();
+    expect(imageBounds.width).toBeGreaterThan(0);
+    expect(imageBounds.height).toBeGreaterThan(0);
+    
+    // Verify log entry was created (flexible count check)
+    const newLogCount = await page.locator('.log-entry').count();
+    expect(newLogCount).toBeGreaterThanOrEqual(initialLogCount);
+    await expect(
+      page.locator('.log-entry').filter({ hasText: 'Image from URL displayed' })
     ).toBeVisible();
   });
 
@@ -343,6 +414,64 @@ Status: All systems operational`;
     await expect(
       page.locator('.log-entry').filter({ hasText: /cleared|Content cleared/ })
     ).toBeVisible();
+  });
+
+  test('should handle image URL errors gracefully', async ({ page, request }) => {
+    // Test with an invalid URL that should fail
+    const invalidUrl = 'https://httpbin.org/status/404';
+    
+    const customRequest = {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: {
+        name: 'display_image_url',
+        arguments: {
+          url: invalidUrl
+        }
+      }
+    };
+    
+    const response = await request.post('http://localhost:3000/mcp', {
+      data: customRequest,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const result = await response.json();
+    
+    // Verify error handling
+    expect(result.result).toBeDefined();
+    expect(result.result.isError).toBe(true);
+    expect(result.result.content[0].text).toContain('Failed to fetch image');
+    
+    // Test with invalid URL format
+    const invalidFormatRequest = {
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/call',
+      params: {
+        name: 'display_image_url',
+        arguments: {
+          url: 'not-a-valid-url'
+        }
+      }
+    };
+    
+    const invalidResponse = await request.post('http://localhost:3000/mcp', {
+      data: invalidFormatRequest,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const invalidResult = await invalidResponse.json();
+    
+    // Verify invalid URL error handling
+    expect(invalidResult.result).toBeDefined();
+    expect(invalidResult.result.isError).toBe(true);
+    expect(invalidResult.result.content[0].text).toContain('Invalid URL format');
   });
 
   test('should handle content display errors gracefully', async ({ page, request }) => {

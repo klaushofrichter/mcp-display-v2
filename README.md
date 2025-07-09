@@ -167,6 +167,7 @@ Once connected, both Claude Code and Gemini CLI will have access to these tools:
 - `display_text` - Display text content in the browser
 - `display_image` - Display base64-encoded images
 - `display_svg` - Display SVG graphics
+- `display_image_url` - Display images from URLs (fetches and converts to base64)
 
 ## Software Structure
 
@@ -196,7 +197,7 @@ mcp-display-v2/
 
 1. **MCP Server** (`server/mcpServer.js`)
    - Implements Model Context Protocol specification
-   - Provides three tools: `display_text`, `display_image`, `display_svg`
+   - Provides four tools: `display_text`, `display_image`, `display_svg`, `display_image_url`
    - Handles HTTP transport for MCP communication
    - Validates and processes content before display
 
@@ -359,6 +360,24 @@ curl -X POST http://localhost:3000/mcp \
   }'
 ```
 
+### Image URL Display
+
+```bash
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 4,
+    "method": "tools/call",
+    "params": {
+      "name": "display_image_url",
+      "arguments": {
+        "url": "https://httpbin.org/image/png"
+      }
+    }
+  }'
+```
+
 ## Browser Interface
 
 Access the web interface at `http://localhost:5173` during development or the configured port in production.
@@ -373,8 +392,9 @@ Access the web interface at `http://localhost:5173` during development or the co
 ### Content Display
 
 - **Text**: Monospace font with syntax highlighting
-- **Images**: Responsive with automatic scaling
+- **Images**: Responsive with automatic scaling (base64 or URL sources)
 - **SVG**: Vector graphics with proper scaling
+- **Image URLs**: Automatically fetched and converted to base64 display
 - **Metadata**: Type and timestamp for each content item
 
 ## Troubleshooting

@@ -3,6 +3,7 @@
     <div class="sidebar">
       <div class="sidebar-header">
         <h2>MCP Connections</h2>
+        <button @click="clearLogs" class="clear-logs-button">Clear Logs</button>
       </div>
       <div class="sidebar-content">
         <div v-if="logEntries.length === 0" class="empty-state">
@@ -30,12 +31,12 @@
         <div v-else>
           <div v-for="item in contentItems" :key="item.id" class="content-card">
             <div class="content-meta">
-              <div class="content-type">{{ item.type }}</div>
+              <div class="content-type">{{ formatContentType(item.type) }}</div>
               <div class="content-time">{{ formatTime(item.timestamp) }}</div>
             </div>
             <div class="content-body">
               <div v-if="item.type === 'text'" class="text-content">{{ item.content }}</div>
-              <div v-else-if="item.type === 'image'" class="image-content">
+              <div v-else-if="item.type === 'image' || item.type === 'image-url'" class="image-content">
                 <img :src="item.content" :alt="`Image content from ${formatTime(item.timestamp)}`" />
               </div>
               <div v-else-if="item.type === 'svg'" class="svg-content" v-html="item.content"></div>
@@ -62,9 +63,23 @@ export default {
       return new Date(timestamp).toLocaleTimeString()
     }
 
+    const formatContentType = (type) => {
+      const typeMap = {
+        'text': 'Text',
+        'image': 'Image',
+        'image-url': 'Image-URL',
+        'svg': 'SVG'
+      }
+      return typeMap[type] || type.toUpperCase()
+    }
+
     const clearDisplay = () => {
       contentItems.value = []
       addLogEntry('Display cleared by user')
+    }
+
+    const clearLogs = () => {
+      logEntries.value = []
     }
 
     const addLogEntry = (message) => {
@@ -150,7 +165,9 @@ export default {
       contentItems,
       logEntries,
       formatTime,
-      clearDisplay
+      formatContentType,
+      clearDisplay,
+      clearLogs
     }
   }
 }
