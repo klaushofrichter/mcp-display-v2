@@ -271,7 +271,7 @@ describe('McpServer', () => {
   });
 
   describe('handleInitialize', () => {
-    test('should return proper initialization response', async () => {
+    test('should return proper initialization response with client info', async () => {
       const params = {
         protocolVersion: '2024-11-05',
         capabilities: { roots: { listChanged: true } },
@@ -284,7 +284,148 @@ describe('McpServer', () => {
       expect(result.capabilities.tools).toBeDefined();
       expect(result.serverInfo.name).toBe('mcp-display-server');
       expect(result.serverInfo.version).toBe('1.0.0');
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('MCP client connected: test-client v1.0.0');
+      
+      // Verify client info is stored for later use
+      expect(mcpServer.lastClientInfo).toEqual({ name: 'test-client', version: '1.0.0' });
+    });
+
+    test('should handle missing client info gracefully', async () => {
+      const params = {
+        protocolVersion: '2024-11-05',
+        capabilities: { roots: { listChanged: true } }
+        // No clientInfo provided
+      };
+      
+      const result = await mcpServer.handleInitialize(params);
+      
+      expect(result.protocolVersion).toBe('2024-11-05');
+      expect(result.capabilities.tools).toBeDefined();
+      expect(result.serverInfo.name).toBe('mcp-display-server');
+      expect(result.serverInfo.version).toBe('1.0.0');
       expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('MCP client initialization started');
+      
+      // Verify no client info is stored
+      expect(mcpServer.lastClientInfo).toBeUndefined();
+    });
+
+    test('should handle incomplete client info gracefully', async () => {
+      const params = {
+        protocolVersion: '2024-11-05',
+        capabilities: { roots: { listChanged: true } },
+        clientInfo: { name: 'claude-code' } // No version provided
+      };
+      
+      const result = await mcpServer.handleInitialize(params);
+      
+      expect(result.protocolVersion).toBe('2024-11-05');
+      expect(result.capabilities.tools).toBeDefined();
+      expect(result.serverInfo.name).toBe('mcp-display-server');
+      expect(result.serverInfo.version).toBe('1.0.0');
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('MCP client connected: claude-code vunknown');
+      
+      // Verify incomplete client info is stored
+      expect(mcpServer.lastClientInfo).toEqual({ name: 'claude-code' });
+    });
+
+    test('should handle empty client info gracefully', async () => {
+      const params = {
+        protocolVersion: '2024-11-05',
+        capabilities: { roots: { listChanged: true } },
+        clientInfo: {} // Empty clientInfo
+      };
+      
+      const result = await mcpServer.handleInitialize(params);
+      
+      expect(result.protocolVersion).toBe('2024-11-05');
+      expect(result.capabilities.tools).toBeDefined();
+      expect(result.serverInfo.name).toBe('mcp-display-server');
+      expect(result.serverInfo.version).toBe('1.0.0');
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('MCP client connected: unknown vunknown');
+      
+      // Verify empty client info is stored
+      expect(mcpServer.lastClientInfo).toEqual({});
+    });
+  });
+
+  describe('handleInitialized', () => {
+    test('should handle initialized notification with stored client info', async () => {
+      // First initialize with client info
+      const initParams = {
+        protocolVersion: '2024-11-05',
+        capabilities: { roots: {} },
+        clientInfo: { name: 'claude-code', version: '1.0.44' }
+      };
+      await mcpServer.handleInitialize(initParams);
+      
+      // Clear previous call logs
+      mockWebSocketHandler.sendLog.mockClear();
+      
+      // Then call initialized
+      await mcpServer.handleInitialized();
+      
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('MCP client ready: claude-code v1.0.44');
+    });
+
+    test('should handle initialized notification without stored client info', async () => {
+      // Call initialized without prior initialization (or with no client info)
+      await mcpServer.handleInitialized();
+      
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('MCP client fully initialized');
+    });
+
+    test('should handle initialized notification with incomplete stored client info', async () => {
+      // First initialize with incomplete client info
+      const initParams = {
+        protocolVersion: '2024-11-05',
+        capabilities: { roots: {} },
+        clientInfo: { name: 'test-client' } // No version
+      };
+      await mcpServer.handleInitialize(initParams);
+      
+      // Clear previous call logs
+      mockWebSocketHandler.sendLog.mockClear();
+      
+      // Then call initialized
+      await mcpServer.handleInitialized();
+      
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('MCP client ready: test-client vunknown');
+    });
+
+    test('should handle initialized notification with empty stored client info', async () => {
+      // First initialize with empty client info
+      const initParams = {
+        protocolVersion: '2024-11-05',
+        capabilities: { roots: {} },
+        clientInfo: {} // Empty
+      };
+      await mcpServer.handleInitialize(initParams);
+      
+      // Clear previous call logs
+      mockWebSocketHandler.sendLog.mockClear();
+      
+      // Then call initialized
+      await mcpServer.handleInitialized();
+      
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('MCP client ready: unknown vunknown');
+    });
+
+    test('should work without WebSocket handler', async () => {
+      // Create server without WebSocket handler
+      const serverWithoutWS = new McpServer();
+      
+      // Should not throw error
+      await expect(serverWithoutWS.handleInitialized()).resolves.toBeUndefined();
+    });
+
+    test('should log correctly for both notification formats', async () => {
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      
+      await mcpServer.handleInitialized();
+      
+      expect(consoleSpy).toHaveBeenCalledWith('MCP client sent initialized notification');
+      
+      consoleSpy.mockRestore();
     });
   });
 

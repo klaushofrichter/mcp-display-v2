@@ -46,8 +46,21 @@ export class McpServer {
   async handleInitialize(params) {
     console.log('MCP client initializing with params:', params);
     
+    // Store client info for use in initialized notification
+    this.lastClientInfo = params?.clientInfo;
+    
     if (this.webSocketHandler) {
-      this.webSocketHandler.sendLog('MCP client initialization started');
+      // Extract client information for display
+      const clientInfo = params?.clientInfo;
+      let logMessage = 'MCP client initialization started';
+      
+      if (clientInfo) {
+        const clientName = clientInfo.name || 'unknown';
+        const clientVersion = clientInfo.version || 'unknown';
+        logMessage = `MCP client connected: ${clientName} v${clientVersion}`;
+      }
+      
+      this.webSocketHandler.sendLog(logMessage);
     }
 
     return {
@@ -60,6 +73,26 @@ export class McpServer {
         version: '1.0.0',
       },
     };
+  }
+
+  /**
+   * Handle initialized notification (both "initialized" and "notifications/initialized")
+   */
+  async handleInitialized() {
+    console.log('MCP client sent initialized notification');
+    
+    if (this.webSocketHandler) {
+      // Use stored client info if available
+      let logMessage = 'MCP client fully initialized';
+      
+      if (this.lastClientInfo) {
+        const clientName = this.lastClientInfo.name || 'unknown';
+        const clientVersion = this.lastClientInfo.version || 'unknown';
+        logMessage = `MCP client ready: ${clientName} v${clientVersion}`;
+      }
+      
+      this.webSocketHandler.sendLog(logMessage);
+    }
   }
 
   async handleListTools() {
@@ -352,7 +385,7 @@ export class McpServer {
         let response;
         
         // Check for unknown methods first (before try-catch to avoid stack traces)
-        const validMethods = ['initialize', 'initialized', 'tools/list', 'tools/call'];
+        const validMethods = ['initialize', 'initialized', 'notifications/initialized', 'tools/list', 'tools/call'];
         if (!validMethods.includes(request.method)) {
           console.log(`Unknown MCP method requested: "${request.method}". Available methods: ${validMethods.join(', ')}`);
           
@@ -379,15 +412,21 @@ export class McpServer {
               break;
               
             case 'initialized':
-              // This is a notification, no response needed
-              console.log('MCP client initialized successfully');
-              if (this.webSocketHandler) {
-                this.webSocketHandler.sendLog('MCP client connected and initialized');
+            case 'notifications/initialized':
+              // This is a notification - handle it but check if response is expected
+              await this.handleInitialized();
+              
+              // Some MCP implementations expect a response even for notifications
+              if (request.id !== undefined && request.id !== null) {
+                return res.json({
+                  jsonrpc: '2.0',
+                  id: request.id,
+                  result: null
+                });
+              } else {
+                // True notification - no response
+                return res.status(204).send();
               }
-              return res.json({
-                jsonrpc: '2.0',
-                id: request.id
-              });
               
             case 'tools/list':
               response = await this.handleListTools();

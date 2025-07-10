@@ -58,7 +58,7 @@ describe('McpServer HTTP API Error Handling', () => {
         error: {
           code: -32601,
           message: 'Method not found',
-          data: 'Unknown method: "unknown_method". Available methods: initialize, initialized, tools/list, tools/call'
+          data: 'Unknown method: "unknown_method". Available methods: initialize, initialized, notifications/initialized, tools/list, tools/call'
         }
       });
     });
@@ -76,7 +76,7 @@ describe('McpServer HTTP API Error Handling', () => {
         });
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Unknown MCP method requested: "invalid_method". Available methods: initialize, initialized, tools/list, tools/call'
+        'Unknown MCP method requested: "invalid_method". Available methods: initialize, initialized, notifications/initialized, tools/list, tools/call'
       );
       expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('Unknown MCP method: "invalid_method"');
 
@@ -178,6 +178,148 @@ describe('McpServer HTTP API Error Handling', () => {
       expect(response.body.id).toBe(1);
       expect(response.body.result.protocolVersion).toBe('2024-11-05');
       expect(response.body.result.serverInfo.name).toBe('mcp-display-server');
+    });
+
+    test('should handle initialized notification with ID (response expected)', async () => {
+      // First initialize to set up client info
+      await request(app)
+        .post('/mcp')
+        .send({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'initialize',
+          params: {
+            protocolVersion: '2024-11-05',
+            capabilities: { roots: {} },
+            clientInfo: { name: 'claude-code', version: '1.0.44' }
+          }
+        });
+
+      // Then send initialized notification with ID
+      const response = await request(app)
+        .post('/mcp')
+        .send({
+          jsonrpc: '2.0',
+          id: 2,
+          method: 'initialized'
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.jsonrpc).toBe('2.0');
+      expect(response.body.id).toBe(2);
+      expect(response.body.result).toBe(null);
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('MCP client ready: claude-code v1.0.44');
+    });
+
+    test('should handle initialized notification without ID (true notification)', async () => {
+      // First initialize to set up client info
+      await request(app)
+        .post('/mcp')
+        .send({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'initialize',
+          params: {
+            protocolVersion: '2024-11-05',
+            capabilities: { roots: {} },
+            clientInfo: { name: 'test-client', version: '2.0.0' }
+          }
+        });
+
+      // Clear previous logs
+      mockWebSocketHandler.sendLog.mockClear();
+
+      // Then send initialized notification without ID
+      const response = await request(app)
+        .post('/mcp')
+        .send({
+          jsonrpc: '2.0',
+          method: 'initialized'
+        });
+
+      expect(response.status).toBe(204);
+      expect(response.body).toEqual({});
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('MCP client ready: test-client v2.0.0');
+    });
+
+    test('should handle initialized notification with null ID', async () => {
+      // Send initialized notification with null ID (should be treated as true notification)
+      const response = await request(app)
+        .post('/mcp')
+        .send({
+          jsonrpc: '2.0',
+          id: null,
+          method: 'initialized'
+        });
+
+      expect(response.status).toBe(204);
+      expect(response.body).toEqual({});
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('MCP client fully initialized');
+    });
+
+    test('should handle proper MCP notifications/initialized method with ID', async () => {
+      // First initialize to set up client info
+      await request(app)
+        .post('/mcp')
+        .send({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'initialize',
+          params: {
+            protocolVersion: '2024-11-05',
+            capabilities: { roots: {} },
+            clientInfo: { name: 'proper-mcp-client', version: '1.0.0' }
+          }
+        });
+
+      // Clear previous logs
+      mockWebSocketHandler.sendLog.mockClear();
+
+      // Then send proper MCP notifications/initialized with ID
+      const response = await request(app)
+        .post('/mcp')
+        .send({
+          jsonrpc: '2.0',
+          id: 2,
+          method: 'notifications/initialized'
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.jsonrpc).toBe('2.0');
+      expect(response.body.id).toBe(2);
+      expect(response.body.result).toBe(null);
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('MCP client ready: proper-mcp-client v1.0.0');
+    });
+
+    test('should handle proper MCP notifications/initialized without ID (true notification)', async () => {
+      // First initialize to set up client info
+      await request(app)
+        .post('/mcp')
+        .send({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'initialize',
+          params: {
+            protocolVersion: '2025-03-26',
+            capabilities: { roots: {} },
+            clientInfo: { name: 'spec-compliant-client', version: '2.0.0' }
+          }
+        });
+
+      // Clear previous logs
+      mockWebSocketHandler.sendLog.mockClear();
+
+      // Then send proper MCP notifications/initialized without ID (as per spec)
+      const response = await request(app)
+        .post('/mcp')
+        .send({
+          jsonrpc: '2.0',
+          method: 'notifications/initialized'
+        });
+
+      expect(response.status).toBe(204);
+      expect(response.body).toEqual({});
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('MCP client ready: spec-compliant-client v2.0.0');
     });
 
     test('should handle tools/list method correctly', async () => {

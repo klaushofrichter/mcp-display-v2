@@ -114,3 +114,197 @@ test.describe('MCP Display Content Simulation', () => {
     await expect(contentArea).toHaveCSS('overflow-y', 'auto');
   });
 }); 
+
+test.describe('MCP Display Client Information', () => {
+  test('should display client information in connections log', async ({ page, request }) => {
+    // Navigate to the MCP Display page
+    await page.goto('http://localhost:5173');
+    
+    // Wait for initial connection to be established
+    await page.waitForSelector('.log-entry', { timeout: 10000 });
+    
+    // Make an initialize request with client info
+    const response = await request.post('http://localhost:3000/mcp', {
+      data: {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2024-11-05',
+          capabilities: { roots: { listChanged: true } },
+          clientInfo: { name: 'claude-code', version: '1.0.44' }
+        }
+      },
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    // Verify the initialize request was successful
+    expect(response.ok()).toBe(true);
+    const responseData = await response.json();
+    expect(responseData.result.serverInfo.name).toBe('mcp-display-server');
+    
+    // Wait for the client connection log to appear
+    await page.waitForFunction(() => {
+      const logEntries = document.querySelectorAll('.log-entry .log-message');
+      return Array.from(logEntries).some(entry => 
+        entry.textContent.includes('MCP client connected: claude-code v1.0.44')
+      );
+    }, { timeout: 5000 });
+    
+    // Verify the client info appears in the connections log
+    const logEntries = await page.locator('.log-entry .log-message').allTextContents();
+    const clientLogEntry = logEntries.find(entry => 
+      entry.includes('MCP client connected: claude-code v1.0.44')
+    );
+    
+    expect(clientLogEntry).toBeDefined();
+    expect(clientLogEntry).toBe('MCP client connected: claude-code v1.0.44');
+  });
+
+  test('should display complete initialization flow with initialized notification', async ({ page, request }) => {
+    // Navigate to the MCP Display page
+    await page.goto('http://localhost:5173');
+    
+    // Wait for initial connection to be established
+    await page.waitForSelector('.log-entry', { timeout: 10000 });
+    
+    // 1. Initialize with client info
+    const initResponse = await request.post('http://localhost:3000/mcp', {
+      data: {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-06-18',
+          capabilities: { roots: {} },
+          clientInfo: { name: 'gemini-cli', version: '2.1.0' }
+        }
+      },
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    expect(initResponse.ok()).toBe(true);
+    
+    // Wait for initialize log to appear
+    await page.waitForFunction(() => {
+      const logEntries = document.querySelectorAll('.log-entry .log-message');
+      return Array.from(logEntries).some(entry => 
+        entry.textContent.includes('MCP client connected: gemini-cli v2.1.0')
+      );
+    }, { timeout: 5000 });
+    
+    // 2. Send initialized notification
+    const initializedResponse = await request.post('http://localhost:3000/mcp', {
+      data: {
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'initialized'
+      },
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    expect(initializedResponse.ok()).toBe(true);
+    const initializedData = await initializedResponse.json();
+    expect(initializedData.result).toBe(null);
+    
+    // Wait for initialized log to appear
+    await page.waitForFunction(() => {
+      const logEntries = document.querySelectorAll('.log-entry .log-message');
+      return Array.from(logEntries).some(entry => 
+        entry.textContent.includes('MCP client ready: gemini-cli v2.1.0')
+      );
+    }, { timeout: 5000 });
+    
+    // Verify both logs appear in the connections log
+    const logEntries = await page.locator('.log-entry .log-message').allTextContents();
+    
+    const initLogEntry = logEntries.find(entry => 
+      entry.includes('MCP client connected: gemini-cli v2.1.0')
+    );
+    const readyLogEntry = logEntries.find(entry => 
+      entry.includes('MCP client ready: gemini-cli v2.1.0')
+    );
+    
+    expect(initLogEntry).toBeDefined();
+    expect(readyLogEntry).toBeDefined();
+    expect(initLogEntry).toBe('MCP client connected: gemini-cli v2.1.0');
+    expect(readyLogEntry).toBe('MCP client ready: gemini-cli v2.1.0');
+  });
+
+  test('should handle proper MCP notifications/initialized method', async ({ page, request }) => {
+    // Navigate to the MCP Display page
+    await page.goto('http://localhost:5173');
+    
+    // Wait for initial connection to be established
+    await page.waitForSelector('.log-entry', { timeout: 10000 });
+    
+    // 1. Initialize with client info
+    const initResponse = await request.post('http://localhost:3000/mcp', {
+      data: {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-03-26',
+          capabilities: { roots: {} },
+          clientInfo: { name: 'spec-compliant-client', version: '3.0.0' }
+        }
+      },
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    expect(initResponse.ok()).toBe(true);
+    
+    // Wait for initialize log to appear
+    await page.waitForFunction(() => {
+      const logEntries = document.querySelectorAll('.log-entry .log-message');
+      return Array.from(logEntries).some(entry => 
+        entry.textContent.includes('MCP client connected: spec-compliant-client v3.0.0')
+      );
+    }, { timeout: 5000 });
+    
+    // 2. Send proper MCP notifications/initialized (without ID as per spec)
+    const initializedResponse = await request.post('http://localhost:3000/mcp', {
+      data: {
+        jsonrpc: '2.0',
+        method: 'notifications/initialized'
+      },
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    expect(initializedResponse.status()).toBe(204); // No Content for true notification
+    
+    // Wait for initialized log to appear
+    await page.waitForFunction(() => {
+      const logEntries = document.querySelectorAll('.log-entry .log-message');
+      return Array.from(logEntries).some(entry => 
+        entry.textContent.includes('MCP client ready: spec-compliant-client v3.0.0')
+      );
+    }, { timeout: 5000 });
+    
+    // Verify both logs appear in the connections log
+    const logEntries = await page.locator('.log-entry .log-message').allTextContents();
+    
+    const initLogEntry = logEntries.find(entry => 
+      entry.includes('MCP client connected: spec-compliant-client v3.0.0')
+    );
+    const readyLogEntry = logEntries.find(entry => 
+      entry.includes('MCP client ready: spec-compliant-client v3.0.0')
+    );
+    
+    expect(initLogEntry).toBeDefined();
+    expect(readyLogEntry).toBeDefined();
+    expect(initLogEntry).toBe('MCP client connected: spec-compliant-client v3.0.0');
+    expect(readyLogEntry).toBe('MCP client ready: spec-compliant-client v3.0.0');
+  });
+}); 
