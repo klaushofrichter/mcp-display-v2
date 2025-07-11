@@ -308,3 +308,208 @@ test.describe('MCP Display Client Information', () => {
     expect(readyLogEntry).toBe('MCP client ready: spec-compliant-client v3.0.0');
   });
 }); 
+
+test.describe('MCP Display Resizable Columns', () => {
+  test('should clear logs when Clear Logs button is clicked', async ({ page }) => {
+    // Navigate to the application
+    await page.goto('http://localhost:5173')
+    
+    // Wait for the app to load
+    await page.waitForSelector('.mcp-display')
+    
+    // Check that Clear Logs button exists
+    const clearLogsButton = page.locator('.clear-logs-button')
+    await expect(clearLogsButton).toBeVisible()
+    await expect(clearLogsButton).toHaveText('Clear Logs')
+    
+    // If there are no logs initially, we can't test clearing, so let's trigger some logs
+    // by attempting a connection (which should generate log entries)
+    await page.waitForTimeout(1000) // Wait for WebSocket connection
+    
+    // Check if logs are present, and if so, clear them
+    const logEntries = page.locator('.log-entry')
+    const logCount = await logEntries.count()
+    
+    if (logCount > 0) {
+      // Click the Clear Logs button
+      await clearLogsButton.click()
+      
+      // Wait for the logs to be cleared
+      await page.waitForTimeout(100)
+      
+      // Verify logs are cleared and empty state is shown
+      const emptyState = page.locator('.sidebar .empty-state')
+      await expect(emptyState).toBeVisible()
+      await expect(emptyState).toContainText('No connections yet')
+    }
+    
+    // Verify button is still present and functional after clearing
+    await expect(clearLogsButton).toBeVisible()
+  })
+
+  test('should make columns resizable by dragging', async ({ page }) => {
+    // Navigate to the application
+    await page.goto('http://localhost:5173')
+    
+    // Wait for the app to load
+    await page.waitForSelector('.mcp-display')
+    
+    // Get initial sidebar width
+    const sidebar = page.locator('.sidebar')
+    const initialBoundingBox = await sidebar.boundingBox()
+    const initialWidth = initialBoundingBox.width
+    
+    // Find the resizer handle
+    const resizer = page.locator('.resizer')
+    await expect(resizer).toBeVisible()
+    
+    // Get resizer position
+    const resizerBox = await resizer.boundingBox()
+    const startX = resizerBox.x + resizerBox.width / 2
+    const startY = resizerBox.y + resizerBox.height / 2
+    
+    // Drag the resizer to the right to increase sidebar width
+    await page.mouse.move(startX, startY)
+    await page.mouse.down()
+    await page.mouse.move(startX + 100, startY) // Move 100px to the right
+    await page.mouse.up()
+    
+    // Wait for resize to complete
+    await page.waitForTimeout(100)
+    
+    // Get new sidebar width
+    const newBoundingBox = await sidebar.boundingBox()
+    const newWidth = newBoundingBox.width
+    
+    // Verify the width has changed
+    expect(newWidth).toBeGreaterThan(initialWidth)
+    expect(Math.abs(newWidth - initialWidth - 100)).toBeLessThan(10) // Allow for small differences
+  })
+
+  test('should show visual feedback during resize', async ({ page }) => {
+    // Navigate to the application
+    await page.goto('http://localhost:5173')
+    
+    // Wait for the app to load
+    await page.waitForSelector('.mcp-display')
+    
+    // Find the resizer handle
+    const resizer = page.locator('.resizer')
+    await expect(resizer).toBeVisible()
+    
+    // Get resizer position
+    const resizerBox = await resizer.boundingBox()
+    const startX = resizerBox.x + resizerBox.width / 2
+    const startY = resizerBox.y + resizerBox.height / 2
+    
+    // Start dragging (mousedown but don't release)
+    await page.mouse.move(startX, startY)
+    await page.mouse.down()
+    
+    // Check for resizing visual feedback
+    const mcpDisplay = page.locator('.mcp-display')
+    await expect(mcpDisplay).toHaveClass(/resizing/)
+    
+    const resizerWithClass = page.locator('.resizer.resizing')
+    await expect(resizerWithClass).toBeVisible()
+    
+    // Complete the drag
+    await page.mouse.move(startX + 50, startY)
+    await page.mouse.up()
+    
+    // Wait for resize to complete
+    await page.waitForTimeout(100)
+    
+    // Check that resizing class is removed
+    await expect(mcpDisplay).not.toHaveClass(/resizing/)
+  })
+
+  test('should respect minimum and maximum width constraints', async ({ page }) => {
+    // Navigate to the application
+    await page.goto('http://localhost:5173')
+    
+    // Wait for the app to load
+    await page.waitForSelector('.mcp-display')
+    
+    const sidebar = page.locator('.sidebar')
+    const resizer = page.locator('.resizer')
+    
+    // Get resizer position
+    const resizerBox = await resizer.boundingBox()
+    const startX = resizerBox.x + resizerBox.width / 2
+    const startY = resizerBox.y + resizerBox.height / 2
+    
+    // Test minimum width constraint - try to drag to very small width
+    await page.mouse.move(startX, startY)
+    await page.mouse.down()
+    await page.mouse.move(50, startY) // Try to make it very narrow
+    await page.mouse.up()
+    
+    await page.waitForTimeout(100)
+    
+    // Check that sidebar is not too narrow (minimum 200px)
+    const minWidthBox = await sidebar.boundingBox()
+    expect(minWidthBox.width).toBeGreaterThanOrEqual(200)
+    
+    // Test maximum width constraint - try to drag to very large width
+    await page.mouse.move(startX, startY)
+    await page.mouse.down()
+    
+    // Get viewport width to calculate maximum reasonable width
+    const viewportSize = page.viewportSize()
+    const maxReasonableWidth = viewportSize.width - 400 // Leave 400px for main content
+    
+    await page.mouse.move(maxReasonableWidth + 100, startY) // Try to make it too wide
+    await page.mouse.up()
+    
+    await page.waitForTimeout(100)
+    
+    // Check that sidebar is not too wide
+    const maxWidthBox = await sidebar.boundingBox()
+    expect(maxWidthBox.width).toBeLessThanOrEqual(maxReasonableWidth + 50) // Allow small tolerance
+  })
+
+  test('should preserve layout after resizing', async ({ page }) => {
+    // Navigate to the application
+    await page.goto('http://localhost:5173')
+    
+    // Wait for the app to load
+    await page.waitForSelector('.mcp-display')
+    
+    // Verify both columns are visible initially
+    const sidebar = page.locator('.sidebar')
+    const mainContent = page.locator('.main-content')
+    
+    await expect(sidebar).toBeVisible()
+    await expect(mainContent).toBeVisible()
+    
+    // Resize the sidebar
+    const resizer = page.locator('.resizer')
+    const resizerBox = await resizer.boundingBox()
+    const startX = resizerBox.x + resizerBox.width / 2
+    const startY = resizerBox.y + resizerBox.height / 2
+    
+    await page.mouse.move(startX, startY)
+    await page.mouse.down()
+    await page.mouse.move(startX + 150, startY)
+    await page.mouse.up()
+    
+    await page.waitForTimeout(100)
+    
+    // Verify both columns are still visible and functional
+    await expect(sidebar).toBeVisible()
+    await expect(mainContent).toBeVisible()
+    
+    // Check that sidebar content is still accessible
+    const clearLogsButton = page.locator('.clear-logs-button')
+    await expect(clearLogsButton).toBeVisible()
+    
+    // Check that main content is still accessible
+    const clearDisplayButton = page.locator('.clear-button')
+    await expect(clearDisplayButton).toBeVisible()
+    
+    // Verify the resize actually took effect
+    const newSidebarBox = await sidebar.boundingBox()
+    expect(newSidebarBox.width).toBeGreaterThan(300) // Should be wider than default 300px
+  })
+}); 

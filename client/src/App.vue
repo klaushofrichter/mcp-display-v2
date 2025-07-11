@@ -1,6 +1,6 @@
 <template>
-  <div class="mcp-display">
-    <div class="sidebar">
+  <div class="mcp-display" :class="{ 'resizing': isResizing }">
+    <div class="sidebar" :style="{ width: sidebarWidth + 'px' }">
       <div class="sidebar-header">
         <h2>MCP Connections</h2>
         <button @click="clearLogs" class="clear-logs-button">Clear Logs</button>
@@ -17,6 +17,12 @@
         </div>
       </div>
     </div>
+    
+    <div 
+      class="resizer" 
+      @mousedown="startResize"
+      :class="{ 'resizing': isResizing }"
+    ></div>
     
     <div class="main-content">
       <div class="main-header">
@@ -56,6 +62,8 @@ export default {
   setup() {
     const contentItems = ref([])
     const logEntries = ref([])
+    const sidebarWidth = ref(300)
+    const isResizing = ref(false)
     let socket = null
     let nextId = 1
 
@@ -109,6 +117,31 @@ export default {
       }
     }
 
+    const startResize = (e) => {
+      isResizing.value = true
+      document.addEventListener('mousemove', handleResize)
+      document.addEventListener('mouseup', stopResize)
+      e.preventDefault()
+    }
+
+    const handleResize = (e) => {
+      if (!isResizing.value) return
+      
+      const newWidth = e.clientX
+      const minWidth = 200
+      const maxWidth = window.innerWidth - 400 // Leave at least 400px for main content
+      
+      if (newWidth >= minWidth && newWidth <= maxWidth) {
+        sidebarWidth.value = newWidth
+      }
+    }
+
+    const stopResize = () => {
+      isResizing.value = false
+      document.removeEventListener('mousemove', handleResize)
+      document.removeEventListener('mouseup', stopResize)
+    }
+
     const connectWebSocket = () => {
       try {
         socket = new WebSocket('ws://localhost:3001')
@@ -159,15 +192,21 @@ export default {
       if (socket) {
         socket.close()
       }
+      // Clean up event listeners
+      document.removeEventListener('mousemove', handleResize)
+      document.removeEventListener('mouseup', stopResize)
     })
 
     return {
       contentItems,
       logEntries,
+      sidebarWidth,
+      isResizing,
       formatTime,
       formatContentType,
       clearDisplay,
-      clearLogs
+      clearLogs,
+      startResize
     }
   }
 }

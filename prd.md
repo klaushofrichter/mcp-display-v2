@@ -34,6 +34,7 @@
 * new content is shown on top. 
 * each content card has an indicator for the type and time of the content display on the left of the card, and the actual content on the right, left-aligned
 * We create a favicon the shows a monitor
+* It is possible to adjust the width of the left and right columns dynamicallu with a resize handle
 
 # Documentation
 * We create an detailed README.md, including these sections:
