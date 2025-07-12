@@ -384,7 +384,7 @@ describe('McpServer', () => {
       const result = await mcpServer.handleToolCall(params);
       
       expect(result.isError).toBe(true);
-      expect(consoleSpy).toHaveBeenCalledWith('Unknown tool requested: "nonexistent_tool". Available tools: display_text, display_image, display_svg, display_image_url, open_url');
+      expect(consoleSpy).toHaveBeenCalledWith('Unknown tool requested: "nonexistent_tool". Available tools: display_text, display_image, display_svg, display_image_url, open_url, display_html');
       
       // Ensure no error was logged (no stack trace)
       expect(jest.spyOn(console, 'error')).not.toHaveBeenCalled();
@@ -556,8 +556,8 @@ describe('McpServer', () => {
     test('should return all available tools', async () => {
       const result = await mcpServer.handleListTools();
       
-      expect(result.tools).toHaveLength(5);
-      expect(result.tools.map(t => t.name)).toEqual(['display_text', 'display_image', 'display_svg', 'display_image_url', 'open_url']);
+      expect(result.tools).toHaveLength(6);
+      expect(result.tools.map(t => t.name)).toEqual(['display_text', 'display_image', 'display_svg', 'display_image_url', 'open_url', 'display_html']);
       
       // Verify tool schemas
       result.tools.forEach(tool => {
@@ -585,6 +585,142 @@ describe('McpServer', () => {
     test('should initialize with correct server info', () => {
       expect(mcpServer.server).toBeDefined();
       expect(mcpServer.webSocketHandler).toBe(mockWebSocketHandler);
+    });
+  });
+
+  describe('handleHtmlDisplay', () => {
+    test('should successfully display safe HTML content', async () => {
+      const args = { content: '<h1>Hello World</h1><p>This is a <strong>test</strong>.</p>' };
+      
+      const result = await mcpServer.handleHtmlDisplay(args);
+      
+      expect(result.content[0].text).toBe('Successfully displayed HTML content');
+      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('html', '<h1>Hello World</h1><p>This is a <strong>test</strong>.</p>', undefined);
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('HTML content displayed');
+    });
+
+    test('should sanitize HTML by removing script tags', async () => {
+      const args = { content: '<h1>Hello</h1><script>alert("xss")</script><p>World</p>' };
+      
+      const result = await mcpServer.handleHtmlDisplay(args);
+      
+      expect(result.content[0].text).toBe('Successfully displayed HTML content');
+      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('html', '<h1>Hello</h1><p>World</p>', undefined);
+    });
+
+    test('should sanitize HTML by removing event handlers', async () => {
+      const args = { content: '<p onclick="alert(\'click\')">Click me</p><div onload="malicious()">Content</div>' };
+      
+      const result = await mcpServer.handleHtmlDisplay(args);
+      
+      expect(result.content[0].text).toBe('Successfully displayed HTML content');
+      // Event handlers should be removed
+      const actualContent = mockWebSocketHandler.sendContent.mock.calls[0][1];
+      expect(actualContent).toContain('Click me');
+      expect(actualContent).toContain('Content');
+      expect(actualContent).not.toContain('onclick');
+      expect(actualContent).not.toContain('onload');
+    });
+
+    test('should remove unsupported tags', async () => {
+      const args = { content: '<h1>Title</h1><form><input type="text"/></form><p>Content</p>' };
+      
+      const result = await mcpServer.handleHtmlDisplay(args);
+      
+      expect(result.content[0].text).toBe('Successfully displayed HTML content');
+      // form and input tags should be removed
+      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('html', '<h1>Title</h1><p>Content</p>', undefined);
+    });
+
+    test('should preserve safe attributes', async () => {
+      const args = { content: '<a href="https://example.com" title="Example">Link</a><img src="image.jpg" alt="Image" width="100" height="100" />' };
+      
+      const result = await mcpServer.handleHtmlDisplay(args);
+      
+      expect(result.content[0].text).toBe('Successfully displayed HTML content');
+      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('html', '<a href="https://example.com" title="Example">Link</a><img src="image.jpg" alt="Image" width="100" height="100" />', undefined);
+    });
+
+    test('should sanitize javascript URLs', async () => {
+      const args = { content: '<a href="javascript:alert(\'xss\')">Malicious Link</a>' };
+      
+      const result = await mcpServer.handleHtmlDisplay(args);
+      
+      expect(result.content[0].text).toBe('Successfully displayed HTML content');
+      // javascript: URL should be removed or made safe
+      const actualContent = mockWebSocketHandler.sendContent.mock.calls[0][1];
+      expect(actualContent).toContain('Malicious Link');
+      expect(actualContent).not.toContain('javascript:');
+      // The sanitization makes it safe by removing the javascript: prefix
+      expect(actualContent).not.toContain('javascript:alert');
+    });
+
+    test('should handle table elements', async () => {
+      const args = { content: '<table><thead><tr><th>Header</th></tr></thead><tbody><tr><td>Cell</td></tr></tbody></table>' };
+      
+      const result = await mcpServer.handleHtmlDisplay(args);
+      
+      expect(result.content[0].text).toBe('Successfully displayed HTML content');
+      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('html', '<table><thead><tr><th>Header</th></tr></thead><tbody><tr><td>Cell</td></tr></tbody></table>', undefined);
+    });
+
+    test('should handle lists', async () => {
+      const args = { content: '<ul><li>Item 1</li><li>Item 2</li></ul><ol><li>First</li><li>Second</li></ol>' };
+      
+      const result = await mcpServer.handleHtmlDisplay(args);
+      
+      expect(result.content[0].text).toBe('Successfully displayed HTML content');
+      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('html', '<ul><li>Item 1</li><li>Item 2</li></ul><ol><li>First</li><li>Second</li></ol>', undefined);
+    });
+
+    test('should handle blockquotes and code', async () => {
+      const args = { content: '<blockquote>Quote</blockquote><pre><code>function test() { return true; }</code></pre>' };
+      
+      const result = await mcpServer.handleHtmlDisplay(args);
+      
+      expect(result.content[0].text).toBe('Successfully displayed HTML content');
+      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('html', '<blockquote>Quote</blockquote><pre><code>function test() { return true; }</code></pre>', undefined);
+    });
+
+    test('should successfully display HTML content with caption', async () => {
+      const args = { 
+        content: '<h1>Title</h1><p>Content</p>',
+        caption: 'Test HTML caption'
+      };
+      
+      const result = await mcpServer.handleHtmlDisplay(args);
+      
+      expect(result.content[0].text).toBe('Successfully displayed HTML content');
+      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('html', '<h1>Title</h1><p>Content</p>', 'Test HTML caption');
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('HTML content displayed');
+    });
+
+    test('should throw error for empty content', async () => {
+      const args = { content: '' };
+      
+      await expect(mcpServer.handleHtmlDisplay(args))
+        .rejects.toThrow('Content must be a non-empty string');
+    });
+
+    test('should throw error for non-string content', async () => {
+      const args = { content: 123 };
+      
+      await expect(mcpServer.handleHtmlDisplay(args))
+        .rejects.toThrow('Content must be a non-empty string');
+    });
+
+    test('should throw error for missing content', async () => {
+      const args = {};
+      
+      await expect(mcpServer.handleHtmlDisplay(args))
+        .rejects.toThrow('Content must be a non-empty string');
+    });
+
+    test('should throw error for content that becomes empty after sanitization', async () => {
+      const args = { content: '<script>alert("only script")</script>' };
+      
+      await expect(mcpServer.handleHtmlDisplay(args))
+        .rejects.toThrow('HTML content is empty after sanitization');
     });
   });
 }); 

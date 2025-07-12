@@ -59,6 +59,10 @@
                 </a>
                 <div v-if="item.caption" class="content-caption">{{ item.caption }}</div>
               </div>
+              <template v-else-if="item.type === 'html'">
+                <div class="html-content" v-html="item.content"></div>
+                <div v-if="item.caption" class="content-caption">{{ item.caption }}</div>
+              </template>
             </div>
           </div>
         </div>
@@ -90,7 +94,8 @@ export default {
         'image': 'Image',
         'image-url': 'Image-URL',
         'svg': 'SVG',
-        'url': 'URL'
+        'url': 'URL',
+        'html': 'HTML'
       }
       return typeMap[type] || type.toUpperCase()
     }

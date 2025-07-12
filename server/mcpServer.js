@@ -3,8 +3,106 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
 /**
+ * HTML Sanitization - Safe subset of HTML tags and attributes
+ */
+const ALLOWED_TAGS = [
+  'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'em', 'b', 'i', 'u',
+  'ul', 'ol', 'li', 'br', 'a', 'div', 'span', 'table', 'tr', 'td', 'th',
+  'thead', 'tbody', 'img', 'blockquote', 'pre', 'code'
+];
+
+const ALLOWED_ATTRIBUTES = {
+  'a': ['href', 'title'],
+  'img': ['src', 'alt', 'title', 'width', 'height'],
+  'table': ['class'],
+  'tr': ['class'],
+  'td': ['class', 'colspan', 'rowspan'],
+  'th': ['class', 'colspan', 'rowspan'],
+  'div': ['class'],
+  'span': ['class'],
+  'p': ['class'],
+  'h1': ['class'], 'h2': ['class'], 'h3': ['class'], 'h4': ['class'], 'h5': ['class'], 'h6': ['class']
+};
+
+/**
+ * Sanitize HTML content to prevent XSS attacks
+ * @param {string} html - Raw HTML content
+ * @returns {string} - Sanitized HTML content
+ */
+function sanitizeHtml(html) {
+  // Remove script tags and their content
+  html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+  
+  // Remove event handlers (onclick, onload, etc.) - improved regex
+  html = html.replace(/\s*on\w+\s*=\s*['"'][^'"]*['"]/gi, '');
+  html = html.replace(/\s*on\w+\s*=\s*[^>\s]+/gi, '');
+  
+  // Remove javascript: URLs - improved to handle more cases
+  html = html.replace(/javascript\s*:/gi, '');
+  
+  // Remove data: URLs except for images
+  html = html.replace(/data:(?!image\/)/gi, '');
+  
+  // Remove style attributes to prevent CSS injection
+  html = html.replace(/\s*style\s*=\s*['"'][^'"]*['"]/gi, '');
+  
+  // Create a simple tag filter
+  let sanitized = html.replace(/<\/?([a-zA-Z0-9]+)([^>]*)>/g, (match, tagName, attributes) => {
+    const lowercaseTag = tagName.toLowerCase();
+    
+    // Check if tag is allowed
+    if (!ALLOWED_TAGS.includes(lowercaseTag)) {
+      return '';
+    }
+    
+    // Process attributes
+    let cleanAttributes = '';
+    if (attributes && ALLOWED_ATTRIBUTES[lowercaseTag]) {
+      const allowedAttrs = ALLOWED_ATTRIBUTES[lowercaseTag];
+      
+      // Extract attributes - improved regex to handle edge cases
+      const attrRegex = /(\w+)\s*=\s*['"']([^'"]*)['"]/g;
+      let attrMatch;
+      while ((attrMatch = attrRegex.exec(attributes)) !== null) {
+        const [, attrName, attrValue] = attrMatch;
+        
+        if (allowedAttrs.includes(attrName.toLowerCase())) {
+          // Additional validation for specific attributes
+          if (attrName.toLowerCase() === 'href' || attrName.toLowerCase() === 'src') {
+            // Only allow http, https, and relative URLs, block javascript:
+            if (attrValue.match(/^(https?:\/\/|\/|#|\?|[a-zA-Z0-9])/) && !attrValue.match(/javascript\s*:/i)) {
+              cleanAttributes += ` ${attrName}="${attrValue}"`;
+            }
+          } else {
+            cleanAttributes += ` ${attrName}="${attrValue}"`;
+          }
+        }
+      }
+    }
+    
+    // Self-closing tags
+    if (['br', 'img'].includes(lowercaseTag)) {
+      return `<${lowercaseTag}${cleanAttributes} />`;
+    }
+    
+    // Check if it's a closing tag
+    if (match.startsWith('</')) {
+      return `</${lowercaseTag}>`;
+    }
+    
+    return `<${lowercaseTag}${cleanAttributes}>`;
+  });
+  
+  // Additional cleanup - remove any remaining event handlers that may have been missed
+  sanitized = sanitized.replace(/\s*on\w+\s*=\s*['"'][^'"]*['"]/gi, '');
+  sanitized = sanitized.replace(/\s*on\w+\s*=\s*[^>\s]+/gi, '');
+  
+  return sanitized;
+}
+
+/**
  * MCP Server implementation for display functionality
- * Provides tools for text, image, and SVG display
+ * Provides tools for text, image, SVG, and HTML display
  */
 export class McpServer {
   constructor() {
@@ -180,6 +278,24 @@ export class McpServer {
             required: ['url'],
           },
         },
+        {
+          name: 'display_html',
+          description: 'Display HTML content in the browser (safe subset only)',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              content: {
+                type: 'string',
+                description: 'HTML content to display. Only safe tags are allowed: p, h1-h6, strong, em, b, i, u, ul, ol, li, br, a, div, span, table, tr, td, th, thead, tbody, img, blockquote, pre, code. Script tags and event handlers are automatically removed.',
+              },
+              caption: {
+                type: 'string',
+                description: 'Optional caption to display underneath the HTML content',
+              },
+            },
+            required: ['content'],
+          },
+        },
       ],
     };
   }
@@ -188,7 +304,7 @@ export class McpServer {
     const { name, arguments: args } = params;
 
     // Check for unknown tool names first (before try-catch to avoid stack traces)
-    const validTools = ['display_text', 'display_image', 'display_svg', 'display_image_url', 'open_url'];
+    const validTools = ['display_text', 'display_image', 'display_svg', 'display_image_url', 'open_url', 'display_html'];
     if (!validTools.includes(name)) {
       console.log(`Unknown tool requested: "${name}". Available tools: ${validTools.join(', ')}`);
       
@@ -219,6 +335,8 @@ export class McpServer {
           return await this.handleImageUrlDisplay(args);
         case 'open_url':
           return await this.handleOpenUrl(args);
+        case 'display_html':
+          return await this.handleHtmlDisplay(args);
       }
     } catch (error) {
       // Log actual errors (validation, processing, etc.) with more detail for debugging
@@ -428,6 +546,44 @@ export class McpServer {
     };
   }
 
+  async handleHtmlDisplay(args) {
+    const { content, caption } = args;
+    
+    if (!content || typeof content !== 'string') {
+      throw new Error('Content must be a non-empty string');
+    }
+
+    // Sanitize HTML content to prevent XSS attacks
+    let sanitizedHtml;
+    try {
+      sanitizedHtml = sanitizeHtml(content);
+    } catch (error) {
+      throw new Error(`Failed to sanitize HTML content: ${error.message}`);
+    }
+
+    // Basic validation that we still have content after sanitization
+    if (!sanitizedHtml.trim()) {
+      throw new Error('HTML content is empty after sanitization');
+    }
+
+    // Send content to browser via WebSocket
+    if (this.webSocketHandler) {
+      this.webSocketHandler.sendContent('html', sanitizedHtml, caption);
+      this.webSocketHandler.sendLog('HTML content displayed');
+    }
+
+    console.log('Displayed HTML content');
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: 'Successfully displayed HTML content',
+        },
+      ],
+    };
+  }
+
   /**
    * Start the MCP server with HTTP transport
    */
@@ -547,7 +703,7 @@ export class McpServer {
       res.json({
         name: 'mcp-display-server',
         version: '1.0.0',
-        description: 'MCP server for displaying text, images, and SVG content',
+        description: 'MCP server for displaying text, images, SVG, and HTML content',
         capabilities: {
           tools: {
             display_text: 'Display ASCII text content',
@@ -555,6 +711,7 @@ export class McpServer {
             display_svg: 'Display SVG content',
             display_image_url: 'Display images from URLs',
             open_url: 'Open URLs in new browser tabs and display clickable links',
+            display_html: 'Display HTML content with safe subset of tags',
           },
         },
         endpoints: {

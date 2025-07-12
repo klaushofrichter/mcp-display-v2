@@ -126,7 +126,7 @@ describe('McpServer HTTP API Error Handling', () => {
           content: [
             {
               type: 'text',
-              text: 'Unknown tool: "unknown_tool". Available tools are: display_text, display_image, display_svg, display_image_url, open_url'
+              text: 'Unknown tool: "unknown_tool". Available tools are: display_text, display_image, display_svg, display_image_url, open_url, display_html'
             }
           ],
           isError: true
@@ -150,7 +150,7 @@ describe('McpServer HTTP API Error Handling', () => {
         });
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Unknown tool requested: "invalid_tool". Available tools: display_text, display_image, display_svg, display_image_url, open_url'
+        'Unknown tool requested: "invalid_tool". Available tools: display_text, display_image, display_svg, display_image_url, open_url, display_html'
       );
       expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('Unknown tool requested: "invalid_tool"');
 
@@ -335,9 +335,9 @@ describe('McpServer HTTP API Error Handling', () => {
       expect(response.status).toBe(200);
       expect(response.body.jsonrpc).toBe('2.0');
       expect(response.body.id).toBe(1);
-      expect(response.body.result.tools).toHaveLength(5);
+      expect(response.body.result.tools).toHaveLength(6);
       expect(response.body.result.tools.map(t => t.name)).toEqual([
-        'display_text', 'display_image', 'display_svg', 'display_image_url', 'open_url'
+        'display_text', 'display_image', 'display_svg', 'display_image_url', 'open_url', 'display_html'
       ]);
     });
 
@@ -358,6 +358,69 @@ describe('McpServer HTTP API Error Handling', () => {
       expect(response.body.jsonrpc).toBe('2.0');
       expect(response.body.id).toBe(1);
       expect(response.body.result.content[0].text).toContain('Successfully displayed text content');
+      expect(response.body.result.isError).toBeUndefined();
+    });
+
+    test('should handle HTML tool calls correctly', async () => {
+      const response = await request(app)
+        .post('/mcp')
+        .send({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: {
+            name: 'display_html',
+            arguments: { content: '<h1>Test HTML</h1><p>This is <strong>bold</strong> text.</p>' }
+          }
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.jsonrpc).toBe('2.0');
+      expect(response.body.id).toBe(1);
+      expect(response.body.result.content[0].text).toBe('Successfully displayed HTML content');
+      expect(response.body.result.isError).toBeUndefined();
+    });
+
+    test('should handle HTML tool calls with sanitization', async () => {
+      const response = await request(app)
+        .post('/mcp')
+        .send({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: {
+            name: 'display_html',
+            arguments: { content: '<h1>Safe Content</h1><script>alert("xss")</script><p>More content</p>' }
+          }
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.jsonrpc).toBe('2.0');
+      expect(response.body.id).toBe(1);
+      expect(response.body.result.content[0].text).toBe('Successfully displayed HTML content');
+      expect(response.body.result.isError).toBeUndefined();
+    });
+
+    test('should handle HTML tool calls with caption', async () => {
+      const response = await request(app)
+        .post('/mcp')
+        .send({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: {
+            name: 'display_html',
+            arguments: { 
+              content: '<h1>HTML with Caption</h1><p>Content</p>',
+              caption: 'This is a caption for HTML content'
+            }
+          }
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.jsonrpc).toBe('2.0');
+      expect(response.body.id).toBe(1);
+      expect(response.body.result.content[0].text).toBe('Successfully displayed HTML content');
       expect(response.body.result.isError).toBeUndefined();
     });
   });

@@ -110,7 +110,7 @@ test.describe('MCP Content Display Integration Tests', () => {
     
     expect(response.result).toBeDefined();
     expect(response.result.tools).toBeDefined();
-    expect(response.result.tools).toHaveLength(5);
+    expect(response.result.tools).toHaveLength(6);
     
     const toolNames = response.result.tools.map(tool => tool.name);
     expect(toolNames).toContain('display_text');
@@ -118,6 +118,7 @@ test.describe('MCP Content Display Integration Tests', () => {
     expect(toolNames).toContain('display_svg');
     expect(toolNames).toContain('display_image_url');
     expect(toolNames).toContain('open_url');
+    expect(toolNames).toContain('display_html');
   });
 
   test('should display text content correctly', async ({ page, request }) => {
@@ -277,6 +278,146 @@ Status: All systems operational`;
     expect(newLogCount).toBeGreaterThanOrEqual(initialLogCount);
     await expect(
       page.locator('.log-entry').filter({ hasText: /Displayed SVG content|svg content/ })
+    ).toBeVisible();
+  });
+
+  test('should display HTML content correctly', async ({ page, request }) => {
+    // Prepare HTML content with various elements
+    const htmlContent = `
+      <h1>HTML Content Test</h1>
+      <p>This is a test of <strong>HTML content display</strong> with various elements.</p>
+      <h2>Features</h2>
+      <ul>
+        <li>Headers (h1, h2, h3, etc.)</li>
+        <li><strong>Bold text</strong> and <em>italic text</em></li>
+        <li>Lists (ordered and unordered)</li>
+        <li>Links: <a href="https://example.com" title="Example">Example Link</a></li>
+        <li>Images: <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==" alt="Test Image" width="50" height="50" /></li>
+      </ul>
+      <h3>Code Example</h3>
+      <pre><code>function hello() {
+  console.log("Hello, World!");
+}</code></pre>
+      <blockquote>
+        This is a blockquote with some <strong>emphasis</strong>.
+      </blockquote>
+      <h3>Table Example</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>HTML Display</td>
+            <td>Feature</td>
+            <td>✅ Working</td>
+          </tr>
+          <tr>
+            <td>Security</td>
+            <td>Sanitization</td>
+            <td>✅ Active</td>
+          </tr>
+        </tbody>
+      </table>
+      <p><em>Timestamp: ${new Date().toISOString()}</em></p>
+    `;
+
+    // Count initial log entries
+    const initialLogCount = await page.locator('.log-entry').count();
+    
+    // Make MCP request to display HTML
+    const customRequest = {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: {
+        name: 'display_html',
+        arguments: {
+          content: htmlContent
+        }
+      }
+    };
+    
+    const response = await request.post('http://localhost:3000/mcp', {
+      data: customRequest,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const result = await response.json();
+    
+    // Verify MCP response is successful
+    expect(result.result).toBeDefined();
+    expect(result.result.content[0].text).toContain('Successfully displayed HTML content');
+    
+    // Wait for content to appear in the browser
+    await expect(page.locator('.content-card')).toBeVisible({ timeout: 5000 });
+    
+    // Verify content type and structure
+    const contentItem = page.locator('.content-card').first();
+    await expect(contentItem.locator('.content-type')).toContainText('HTML');
+    
+    // Verify the actual HTML is displayed
+    const htmlDisplay = contentItem.locator('.html-content');
+    await expect(htmlDisplay).toBeVisible();
+    
+    // Verify various HTML elements are rendered
+    await expect(htmlDisplay.locator('h1')).toContainText('HTML Content Test');
+    await expect(htmlDisplay.locator('h2')).toContainText('Features');
+    await expect(htmlDisplay.locator('h3').first()).toContainText('Code Example');
+    
+    // Verify formatting elements
+    await expect(htmlDisplay.locator('strong').first()).toContainText('HTML content display');
+    await expect(htmlDisplay.locator('em').last()).toContainText('Timestamp:');
+    
+    // Verify lists
+    await expect(htmlDisplay.locator('ul li').first()).toContainText('Headers (h1, h2, h3, etc.)');
+    await expect(htmlDisplay.locator('ul li').nth(1)).toContainText('Bold text');
+    
+    // Verify links
+    const link = htmlDisplay.locator('a');
+    await expect(link).toContainText('Example Link');
+    await expect(link).toHaveAttribute('href', 'https://example.com');
+    await expect(link).toHaveAttribute('title', 'Example');
+    
+    // Verify images
+    const image = htmlDisplay.locator('img');
+    await expect(image).toBeVisible();
+    await expect(image).toHaveAttribute('alt', 'Test Image');
+    await expect(image).toHaveAttribute('width', '50');
+    await expect(image).toHaveAttribute('height', '50');
+    
+    // Verify code blocks
+    const codeBlock = htmlDisplay.locator('pre code');
+    await expect(codeBlock).toContainText('function hello()');
+    await expect(codeBlock).toContainText('console.log("Hello, World!");');
+    
+    // Verify blockquote
+    const blockquote = htmlDisplay.locator('blockquote');
+    await expect(blockquote).toContainText('This is a blockquote');
+    
+    // Verify table
+    const table = htmlDisplay.locator('table');
+    await expect(table).toBeVisible();
+    await expect(table.locator('th').first()).toContainText('Name');
+    await expect(table.locator('th').nth(1)).toContainText('Type');
+    await expect(table.locator('th').last()).toContainText('Status');
+    await expect(table.locator('td').first()).toContainText('HTML Display');
+    await expect(table.locator('td').nth(2)).toContainText('✅ Working');
+    
+    // Verify timestamp is present
+    await expect(htmlDisplay).toContainText('Timestamp:');
+    
+    // Verify log entry was created (flexible count check)
+    const newLogCount = await page.locator('.log-entry').count();
+    expect(newLogCount).toBeGreaterThanOrEqual(initialLogCount);
+    await expect(
+      page.locator('.log-entry').filter({ hasText: /Displayed HTML content|html content/ })
     ).toBeVisible();
   });
 
