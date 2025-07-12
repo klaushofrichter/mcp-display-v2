@@ -409,9 +409,10 @@ export class McpServer {
       throw new Error('URL must use HTTP or HTTPS protocol');
     }
 
-    // Send URL to browser via WebSocket
+    // Send URL to browser via WebSocket (both open and display)
     if (this.webSocketHandler) {
       this.webSocketHandler.sendOpenUrl(url);
+      this.webSocketHandler.sendContent('url', url);
       this.webSocketHandler.sendLog(`Opening URL in new tab: ${url}`);
     }
 
@@ -553,7 +554,7 @@ export class McpServer {
             display_image: 'Display base64-encoded images',
             display_svg: 'Display SVG content',
             display_image_url: 'Display images from URLs',
-            open_url: 'Open URLs in new browser tabs',
+            open_url: 'Open URLs in new browser tabs and display clickable links',
           },
         },
         endpoints: {

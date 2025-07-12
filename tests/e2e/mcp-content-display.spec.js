@@ -350,6 +350,170 @@ Status: All systems operational`;
     ).toBeVisible();
   });
 
+  test('should open URL in new tab and display clickable link', async ({ page, request }) => {
+    // Use the suggested test URL
+    const testUrl = 'http://github.com';
+    
+    // Count initial log entries and content items
+    const initialLogCount = await page.locator('.log-entry').count();
+    const initialContentCount = await page.locator('.content-card').count();
+    
+    // Make MCP request to open URL
+    const customRequest = {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: {
+        name: 'open_url',
+        arguments: {
+          url: testUrl
+        }
+      }
+    };
+    
+    const response = await request.post('http://localhost:3000/mcp', {
+      data: customRequest,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const result = await response.json();
+    
+    // Verify MCP response is successful
+    expect(result.result).toBeDefined();
+    expect(result.result.content[0].text).toContain(`Successfully opened URL in new tab: ${testUrl}`);
+    expect(result.result.isError).toBeUndefined();
+    
+    // Verify URL content is displayed on the page
+    await expect(page.locator('.content-card')).toHaveCount(initialContentCount + 1);
+    
+    // Verify content type and structure
+    const contentItem = page.locator('.content-card').first();
+    await expect(contentItem.locator('.content-type')).toContainText('URL');
+    
+    // Verify the clickable URL link is displayed
+    const urlContent = contentItem.locator('.url-content');
+    await expect(urlContent).toBeVisible();
+    
+    const urlLink = urlContent.locator('.url-link');
+    await expect(urlLink).toBeVisible();
+    await expect(urlLink).toHaveAttribute('href', testUrl);
+    await expect(urlLink).toHaveAttribute('target', '_blank');
+    await expect(urlLink).toHaveAttribute('rel', 'noopener noreferrer');
+    
+    // Verify URL link content structure
+    await expect(urlLink.locator('.url-icon')).toBeVisible();
+    await expect(urlLink.locator('.url-text')).toContainText(testUrl);
+    await expect(urlLink.locator('.external-indicator')).toBeVisible();
+    
+    // Verify log entry was created (flexible count check)
+    const newLogCount = await page.locator('.log-entry').count();
+    expect(newLogCount).toBeGreaterThanOrEqual(initialLogCount);
+    await expect(
+      page.locator('.log-entry').filter({ hasText: `Opening URL in new tab: ${testUrl}` })
+    ).toBeVisible();
+    
+    // Test with HTTPS URL as well
+    const httpsUrl = 'https://github.com';
+    const httpsRequest = {
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/call',
+      params: {
+        name: 'open_url',
+        arguments: {
+          url: httpsUrl
+        }
+      }
+    };
+    
+    const httpsResponse = await request.post('http://localhost:3000/mcp', {
+      data: httpsRequest,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const httpsResult = await httpsResponse.json();
+    
+    // Verify HTTPS URL also works
+    expect(httpsResult.result).toBeDefined();
+    expect(httpsResult.result.content[0].text).toContain(`Successfully opened URL in new tab: ${httpsUrl}`);
+    expect(httpsResult.result.isError).toBeUndefined();
+    
+    // Verify second URL content is also displayed
+    await expect(page.locator('.content-card')).toHaveCount(initialContentCount + 2);
+    
+    // Verify the second URL link
+    const secondContentItem = page.locator('.content-card').nth(0); // First is the most recent
+    const secondUrlLink = secondContentItem.locator('.url-link');
+    await expect(secondUrlLink).toHaveAttribute('href', httpsUrl);
+    await expect(secondUrlLink.locator('.url-text')).toContainText(httpsUrl);
+  });
+
+  test('should display clickable URL links with proper styling and interaction', async ({ page, request }) => {
+    // Use a test URL
+    const testUrl = 'https://github.com';
+    
+    // Make MCP request to open URL
+    const customRequest = {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: {
+        name: 'open_url',
+        arguments: {
+          url: testUrl
+        }
+      }
+    };
+    
+    await request.post('http://localhost:3000/mcp', {
+      data: customRequest,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    // Wait for content to appear
+    await expect(page.locator('.content-card')).toBeVisible({ timeout: 5000 });
+    
+    // Verify URL link styling and structure
+    const urlLink = page.locator('.url-link').first();
+    await expect(urlLink).toBeVisible();
+    
+    // Check for proper CSS classes and styling
+    await expect(urlLink).toHaveClass(/url-link/);
+    
+    // Verify link components are present
+    const urlIcon = urlLink.locator('.url-icon');
+    const urlText = urlLink.locator('.url-text');
+    const externalIndicator = urlLink.locator('.external-indicator');
+    
+    await expect(urlIcon).toBeVisible();
+    await expect(urlIcon).toContainText('🔗');
+    
+    await expect(urlText).toBeVisible();
+    await expect(urlText).toContainText(testUrl);
+    
+    await expect(externalIndicator).toBeVisible();
+    await expect(externalIndicator).toContainText('↗');
+    
+    // Test hover state (verify hover styles can be applied)
+    await urlLink.hover();
+    await expect(urlLink).toBeVisible(); // Should still be visible after hover
+    
+    // Verify the link has proper accessibility attributes
+    await expect(urlLink).toHaveAttribute('target', '_blank');
+    await expect(urlLink).toHaveAttribute('rel', 'noopener noreferrer');
+    await expect(urlLink).toHaveAttribute('href', testUrl);
+    
+    // Verify the link is focusable
+    await urlLink.focus();
+    await expect(urlLink).toBeFocused();
+  });
+
   test('should display multiple content items in sequence', async ({ page, request }) => {
     // Get initial content count
     const initialContentCount = await page.locator('.content-card').count();
@@ -501,6 +665,89 @@ Status: All systems operational`;
     } else {
       expect(response2.result.content[0].text).toContain('Error:');
     }
+  });
+
+  test('should handle open URL errors gracefully', async ({ page, request }) => {
+    // Test with invalid URL format
+    const invalidUrlRequest = {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: {
+        name: 'open_url',
+        arguments: {
+          url: 'not-a-valid-url-format'
+        }
+      }
+    };
+    
+    const response = await request.post('http://localhost:3000/mcp', {
+      data: invalidUrlRequest,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const result = await response.json();
+    
+    // Should receive an error response
+    expect(result.result).toBeDefined();
+    expect(result.result.isError).toBe(true);
+    expect(result.result.content[0].text).toContain('Invalid URL format');
+    
+    // Test with non-HTTP protocol
+    const invalidProtocolRequest = {
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/call',
+      params: {
+        name: 'open_url',
+        arguments: {
+          url: 'ftp://example.com'
+        }
+      }
+    };
+    
+    const response2 = await request.post('http://localhost:3000/mcp', {
+      data: invalidProtocolRequest,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const result2 = await response2.json();
+    
+    // Should receive an error response
+    expect(result2.result).toBeDefined();
+    expect(result2.result.isError).toBe(true);
+    expect(result2.result.content[0].text).toContain('URL must use HTTP or HTTPS protocol');
+    
+    // Test with empty URL
+    const emptyUrlRequest = {
+      jsonrpc: '2.0',
+      id: 3,
+      method: 'tools/call',
+      params: {
+        name: 'open_url',
+        arguments: {
+          url: ''
+        }
+      }
+    };
+    
+    const response3 = await request.post('http://localhost:3000/mcp', {
+      data: emptyUrlRequest,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const result3 = await response3.json();
+    
+    // Should receive an error response
+    expect(result3.result).toBeDefined();
+    expect(result3.result.isError).toBe(true);
+    expect(result3.result.content[0].text).toContain('URL must be a non-empty string');
   });
 
   test('should show real-time log updates for all operations', async ({ page, request }) => {

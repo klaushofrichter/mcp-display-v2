@@ -254,23 +254,25 @@ describe('McpServer', () => {
   });
 
   describe('handleOpenUrl', () => {
-    test('should successfully open a valid URL', async () => {
+    test('should successfully open a valid URL and display content', async () => {
       const args = { url: 'https://example.com' };
       
       const result = await mcpServer.handleOpenUrl(args);
       
       expect(result.content[0].text).toBe('Successfully opened URL in new tab: https://example.com');
       expect(mockWebSocketHandler.sendOpenUrl).toHaveBeenCalledWith('https://example.com');
+      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('url', 'https://example.com');
       expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('Opening URL in new tab: https://example.com');
     });
 
-    test('should successfully open HTTP URL', async () => {
+    test('should successfully open HTTP URL and display content', async () => {
       const args = { url: 'http://example.com' };
       
       const result = await mcpServer.handleOpenUrl(args);
       
       expect(result.content[0].text).toBe('Successfully opened URL in new tab: http://example.com');
       expect(mockWebSocketHandler.sendOpenUrl).toHaveBeenCalledWith('http://example.com');
+      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('url', 'http://example.com');
       expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('Opening URL in new tab: http://example.com');
     });
 

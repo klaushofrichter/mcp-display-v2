@@ -50,6 +50,15 @@
                 <div v-html="item.content"></div>
                 <div v-if="item.caption" class="content-caption">{{ item.caption }}</div>
               </div>
+              <div v-else-if="item.type === 'url'" class="url-content">
+                <div class="url-notice">Click the link below to open the URL:</div>
+                <a :href="item.content" target="_blank" rel="noopener noreferrer" class="url-link">
+                  <span class="url-icon">🔗</span>
+                  <span class="url-text">{{ item.content }}</span>
+                  <span class="external-indicator">↗</span>
+                </a>
+                <div v-if="item.caption" class="content-caption">{{ item.caption }}</div>
+              </div>
             </div>
           </div>
         </div>
@@ -80,7 +89,8 @@ export default {
         'text': 'Text',
         'image': 'Image',
         'image-url': 'Image-URL',
-        'svg': 'SVG'
+        'svg': 'SVG',
+        'url': 'URL'
       }
       return typeMap[type] || type.toUpperCase()
     }
@@ -163,8 +173,17 @@ export default {
               addContentItem(data.contentType, data.content, data.caption)
               addLogEntry(`Received ${data.contentType} content`)
             } else if (data.type === 'openUrl') {
-              window.open(data.url, '_blank')
-              addLogEntry(`Opened URL in new tab: ${data.url}`)
+              try {
+                const newWindow = window.open(data.url, '_blank')
+                if (newWindow === null || newWindow === undefined) {
+                  addLogEntry(`⚠️  Popup blocked! Please allow popups for this site or click the URL link to open: ${data.url}`)
+                } else {
+                  addLogEntry(`✅ Opened URL in new tab: ${data.url}`)
+                }
+              } catch (error) {
+                addLogEntry(`❌ Failed to open URL (popup blocked): ${data.url}`)
+                console.error('Popup blocked:', error)
+              }
             } else if (data.type === 'log') {
               addLogEntry(data.message)
             }
