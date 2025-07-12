@@ -122,6 +122,10 @@ export class McpServer {
                 type: 'string',
                 description: 'Base64-encoded image data (with data URI prefix like data:image/png;base64,)',
               },
+              caption: {
+                type: 'string',
+                description: 'Optional caption to display underneath the image',
+              },
             },
             required: ['content'],
           },
@@ -136,6 +140,10 @@ export class McpServer {
                 type: 'string',
                 description: 'SVG content as a string',
               },
+              caption: {
+                type: 'string',
+                description: 'Optional caption to display underneath the SVG',
+              },
             },
             required: ['content'],
           },
@@ -149,6 +157,10 @@ export class McpServer {
               url: {
                 type: 'string',
                 description: 'URL of the image to display (supports common image formats: JPEG, PNG, GIF, WebP)',
+              },
+              caption: {
+                type: 'string',
+                description: 'Optional caption to display underneath the image',
               },
             },
             required: ['url'],
@@ -238,7 +250,7 @@ export class McpServer {
   }
 
   async handleImageDisplay(args) {
-    const { content } = args;
+    const { content, caption } = args;
     
     if (!content || typeof content !== 'string') {
       throw new Error('Content must be a non-empty string');
@@ -251,7 +263,7 @@ export class McpServer {
 
     // Send content to browser via WebSocket
     if (this.webSocketHandler) {
-      this.webSocketHandler.sendContent('image', content);
+      this.webSocketHandler.sendContent('image', content, caption);
       this.webSocketHandler.sendLog('Image content displayed');
     }
 
@@ -268,7 +280,7 @@ export class McpServer {
   }
 
   async handleSvgDisplay(args) {
-    const { content } = args;
+    const { content, caption } = args;
     
     if (!content || typeof content !== 'string') {
       throw new Error('Content must be a non-empty string');
@@ -281,7 +293,7 @@ export class McpServer {
 
     // Send content to browser via WebSocket
     if (this.webSocketHandler) {
-      this.webSocketHandler.sendContent('svg', content);
+      this.webSocketHandler.sendContent('svg', content, caption);
       this.webSocketHandler.sendLog('SVG content displayed');
     }
 
@@ -298,7 +310,7 @@ export class McpServer {
   }
 
   async handleImageUrlDisplay(args) {
-    const { url } = args;
+    const { url, caption } = args;
     
     if (!url || typeof url !== 'string') {
       throw new Error('URL must be a non-empty string');
@@ -339,7 +351,7 @@ export class McpServer {
 
       // Send content to browser via WebSocket
       if (this.webSocketHandler) {
-        this.webSocketHandler.sendContent('image-url', dataUri);
+        this.webSocketHandler.sendContent('image-url', dataUri, caption);
         this.webSocketHandler.sendLog(`Image from URL displayed: ${url}`);
       }
 

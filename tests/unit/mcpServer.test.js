@@ -57,7 +57,7 @@ describe('McpServer', () => {
       const result = await mcpServer.handleImageDisplay(args);
       
       expect(result.content[0].text).toBe('Successfully displayed image content');
-      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('image', args.content);
+      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('image', args.content, undefined);
       expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('Image content displayed');
     });
 
@@ -74,6 +74,19 @@ describe('McpServer', () => {
       await expect(mcpServer.handleImageDisplay(args))
         .rejects.toThrow('Content must be a non-empty string');
     });
+
+    test('should successfully display image content with caption', async () => {
+      const args = { 
+        content: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==',
+        caption: 'Test image caption'
+      };
+      
+      const result = await mcpServer.handleImageDisplay(args);
+      
+      expect(result.content[0].text).toBe('Successfully displayed image content');
+      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('image', args.content, 'Test image caption');
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('Image content displayed');
+    });
   });
 
   describe('handleSvgDisplay', () => {
@@ -83,7 +96,7 @@ describe('McpServer', () => {
       const result = await mcpServer.handleSvgDisplay(args);
       
       expect(result.content[0].text).toBe('Successfully displayed SVG content');
-      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('svg', args.content);
+      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('svg', args.content, undefined);
       expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('SVG content displayed');
     });
 
@@ -107,6 +120,19 @@ describe('McpServer', () => {
       const result = await mcpServer.handleSvgDisplay(args);
       
       expect(result.content[0].text).toBe('Successfully displayed SVG content');
+    });
+
+    test('should successfully display SVG content with caption', async () => {
+      const args = { 
+        content: '<svg width="100" height="100"><circle cx="50" cy="50" r="40" fill="red"/></svg>',
+        caption: 'Test SVG caption'
+      };
+      
+      const result = await mcpServer.handleSvgDisplay(args);
+      
+      expect(result.content[0].text).toBe('Successfully displayed SVG content');
+      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('svg', args.content, 'Test SVG caption');
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('SVG content displayed');
     });
   });
 
@@ -136,7 +162,7 @@ describe('McpServer', () => {
       
       expect(result.content[0].text).toBe('Successfully displayed image from URL: https://example.com/image.png');
       expect(fetch).toHaveBeenCalledWith('https://example.com/image.png');
-      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('image-url', expect.stringContaining('data:image/png;base64,'));
+      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('image-url', expect.stringContaining('data:image/png;base64,'), undefined);
       expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('Image from URL displayed: https://example.com/image.png');
     });
 
@@ -198,6 +224,31 @@ describe('McpServer', () => {
       
       await expect(mcpServer.handleImageUrlDisplay(args))
         .rejects.toThrow('URL must be a non-empty string');
+    });
+
+    test('should successfully display image from URL with caption', async () => {
+      const mockImageBuffer = Buffer.from('fake-image-data');
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        headers: {
+          get: jest.fn().mockReturnValue('image/png')
+        },
+        arrayBuffer: jest.fn().mockResolvedValue(mockImageBuffer.buffer)
+      };
+      
+      fetch.mockResolvedValue(mockResponse);
+      
+      const args = { 
+        url: 'https://example.com/image.png',
+        caption: 'Test URL image caption'
+      };
+      const result = await mcpServer.handleImageUrlDisplay(args);
+      
+      expect(result.content[0].text).toBe('Successfully displayed image from URL: https://example.com/image.png');
+      expect(fetch).toHaveBeenCalledWith('https://example.com/image.png');
+      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('image-url', expect.stringContaining('data:image/png;base64,'), 'Test URL image caption');
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('Image from URL displayed: https://example.com/image.png');
     });
   });
 

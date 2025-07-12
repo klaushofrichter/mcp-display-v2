@@ -44,8 +44,12 @@
               <div v-if="item.type === 'text'" class="text-content">{{ item.content }}</div>
               <div v-else-if="item.type === 'image' || item.type === 'image-url'" class="image-content">
                 <img :src="item.content" :alt="`Image content from ${formatTime(item.timestamp)}`" />
+                <div v-if="item.caption" class="content-caption">{{ item.caption }}</div>
               </div>
-              <div v-else-if="item.type === 'svg'" class="svg-content" v-html="item.content"></div>
+              <div v-else-if="item.type === 'svg'" class="svg-content">
+                <div v-html="item.content"></div>
+                <div v-if="item.caption" class="content-caption">{{ item.caption }}</div>
+              </div>
             </div>
           </div>
         </div>
@@ -103,11 +107,12 @@ export default {
       }
     }
 
-    const addContentItem = (type, content) => {
+    const addContentItem = (type, content, caption = null) => {
       contentItems.value.unshift({
         id: nextId++,
         type,
         content,
+        caption,
         timestamp: Date.now()
       })
       
@@ -155,7 +160,7 @@ export default {
             const data = JSON.parse(event.data)
             
             if (data.type === 'content') {
-              addContentItem(data.contentType, data.content)
+              addContentItem(data.contentType, data.content, data.caption)
               addLogEntry(`Received ${data.contentType} content`)
             } else if (data.type === 'log') {
               addLogEntry(data.message)

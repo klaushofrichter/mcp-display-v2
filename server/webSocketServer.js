@@ -73,11 +73,12 @@ export function setupWebSocketServer(wsServer) {
       });
     },
 
-    sendContent: function(contentType, content) {
+    sendContent: function(contentType, content, caption = null) {
       this.broadcast({
         type: 'content',
         contentType,
         content,
+        caption,
         timestamp: Date.now()
       });
     },

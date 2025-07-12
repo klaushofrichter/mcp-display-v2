@@ -6,9 +6,9 @@
 * When launched, the MCP server offers a port where a browser can connect ca
 * The MCP server offers these tools to MCP clients:
   * Text display: the MCP client provides simple ASCII text that is then shown in a conected browser
-  * Image display: the MCP client provides base64 encoded image data that is then shown in the connected browser
-  * SVG display: the MCP client provides an SVG object that is shown in the connected browser
-  * Image URL display: the MCP client provides a URL to an image that is shown in the connected browser
+  * Image display: the MCP client provides base64 encoded image data that is then shown in the connected browser. It is possible to provide an optional short string value that is shown as "caption" underneath the image display. 
+  * SVG display: the MCP client provides an SVG object that is shown in the connected browser. It is possible to provide an optional short string value that is shown as "caption" underneath the image display. 
+  * Image URL display: the MCP client provides a URL to an image that is shown in the connected browser. It is possible to provide an optional short string value that is shown as "caption" underneath the image display. 
 * There is a button on the screen that clears the window
 * There is a sidebar that shows a log of MCP client connections
 
@@ -57,7 +57,7 @@
 # Other Infornation
 * We use best practices for software design and project structure
 * We prefer readability of code over efficiency and performance
-* We use only well known 3rd party software packages, and use the latest stabke version
+* We use only well known 3rd party software packages, and use the latest stable version
   * specifically, we use modelcontextprotocol/sdk 1.15.0 or better
 * We use the MIT licence
 * We do not edit the prd.md file
