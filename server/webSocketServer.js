@@ -83,6 +83,14 @@ export function setupWebSocketServer(wsServer) {
       });
     },
 
+    sendOpenUrl: function(url) {
+      this.broadcast({
+        type: 'openUrl',
+        url,
+        timestamp: Date.now()
+      });
+    },
+
     getClientCount: () => clients.size
   };
 } 

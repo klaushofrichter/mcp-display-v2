@@ -166,6 +166,20 @@ export class McpServer {
             required: ['url'],
           },
         },
+        {
+          name: 'open_url',
+          description: 'Open a URL in a new browser tab',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              url: {
+                type: 'string',
+                description: 'URL to open in a new tab (must use HTTP or HTTPS protocol)',
+              },
+            },
+            required: ['url'],
+          },
+        },
       ],
     };
   }
@@ -174,7 +188,7 @@ export class McpServer {
     const { name, arguments: args } = params;
 
     // Check for unknown tool names first (before try-catch to avoid stack traces)
-    const validTools = ['display_text', 'display_image', 'display_svg', 'display_image_url'];
+    const validTools = ['display_text', 'display_image', 'display_svg', 'display_image_url', 'open_url'];
     if (!validTools.includes(name)) {
       console.log(`Unknown tool requested: "${name}". Available tools: ${validTools.join(', ')}`);
       
@@ -203,6 +217,8 @@ export class McpServer {
           return await this.handleSvgDisplay(args);
         case 'display_image_url':
           return await this.handleImageUrlDisplay(args);
+        case 'open_url':
+          return await this.handleOpenUrl(args);
       }
     } catch (error) {
       // Log actual errors (validation, processing, etc.) with more detail for debugging
@@ -373,6 +389,44 @@ export class McpServer {
     }
   }
 
+  async handleOpenUrl(args) {
+    const { url } = args;
+    
+    if (!url || typeof url !== 'string') {
+      throw new Error('URL must be a non-empty string');
+    }
+
+    // Basic URL validation
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(url);
+    } catch (error) {
+      throw new Error('Invalid URL format');
+    }
+
+    // Only allow http and https protocols for security
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      throw new Error('URL must use HTTP or HTTPS protocol');
+    }
+
+    // Send URL to browser via WebSocket
+    if (this.webSocketHandler) {
+      this.webSocketHandler.sendOpenUrl(url);
+      this.webSocketHandler.sendLog(`Opening URL in new tab: ${url}`);
+    }
+
+    console.log(`Opening URL in new tab: ${url}`);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Successfully opened URL in new tab: ${url}`,
+        },
+      ],
+    };
+  }
+
   /**
    * Start the MCP server with HTTP transport
    */
@@ -499,6 +553,7 @@ export class McpServer {
             display_image: 'Display base64-encoded images',
             display_svg: 'Display SVG content',
             display_image_url: 'Display images from URLs',
+            open_url: 'Open URLs in new browser tabs',
           },
         },
         endpoints: {

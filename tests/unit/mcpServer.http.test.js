@@ -126,7 +126,7 @@ describe('McpServer HTTP API Error Handling', () => {
           content: [
             {
               type: 'text',
-              text: 'Unknown tool: "unknown_tool". Available tools are: display_text, display_image, display_svg, display_image_url'
+              text: 'Unknown tool: "unknown_tool". Available tools are: display_text, display_image, display_svg, display_image_url, open_url'
             }
           ],
           isError: true
@@ -150,7 +150,7 @@ describe('McpServer HTTP API Error Handling', () => {
         });
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Unknown tool requested: "invalid_tool". Available tools: display_text, display_image, display_svg, display_image_url'
+        'Unknown tool requested: "invalid_tool". Available tools: display_text, display_image, display_svg, display_image_url, open_url'
       );
       expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('Unknown tool requested: "invalid_tool"');
 
@@ -335,9 +335,9 @@ describe('McpServer HTTP API Error Handling', () => {
       expect(response.status).toBe(200);
       expect(response.body.jsonrpc).toBe('2.0');
       expect(response.body.id).toBe(1);
-      expect(response.body.result.tools).toHaveLength(4);
+      expect(response.body.result.tools).toHaveLength(5);
       expect(response.body.result.tools.map(t => t.name)).toEqual([
-        'display_text', 'display_image', 'display_svg', 'display_image_url'
+        'display_text', 'display_image', 'display_svg', 'display_image_url', 'open_url'
       ]);
     });
 

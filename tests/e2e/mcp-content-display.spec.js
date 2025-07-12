@@ -110,13 +110,14 @@ test.describe('MCP Content Display Integration Tests', () => {
     
     expect(response.result).toBeDefined();
     expect(response.result.tools).toBeDefined();
-    expect(response.result.tools).toHaveLength(4);
+    expect(response.result.tools).toHaveLength(5);
     
     const toolNames = response.result.tools.map(tool => tool.name);
     expect(toolNames).toContain('display_text');
     expect(toolNames).toContain('display_image');
     expect(toolNames).toContain('display_svg');
     expect(toolNames).toContain('display_image_url');
+    expect(toolNames).toContain('open_url');
   });
 
   test('should display text content correctly', async ({ page, request }) => {

@@ -9,6 +9,7 @@ describe('McpServer', () => {
     mockWebSocketHandler = {
       sendContent: jest.fn(),
       sendLog: jest.fn(),
+      sendOpenUrl: jest.fn(),
       broadcast: jest.fn(),
       getClientCount: jest.fn().mockReturnValue(1)
     };
@@ -252,6 +253,63 @@ describe('McpServer', () => {
     });
   });
 
+  describe('handleOpenUrl', () => {
+    test('should successfully open a valid URL', async () => {
+      const args = { url: 'https://example.com' };
+      
+      const result = await mcpServer.handleOpenUrl(args);
+      
+      expect(result.content[0].text).toBe('Successfully opened URL in new tab: https://example.com');
+      expect(mockWebSocketHandler.sendOpenUrl).toHaveBeenCalledWith('https://example.com');
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('Opening URL in new tab: https://example.com');
+    });
+
+    test('should successfully open HTTP URL', async () => {
+      const args = { url: 'http://example.com' };
+      
+      const result = await mcpServer.handleOpenUrl(args);
+      
+      expect(result.content[0].text).toBe('Successfully opened URL in new tab: http://example.com');
+      expect(mockWebSocketHandler.sendOpenUrl).toHaveBeenCalledWith('http://example.com');
+      expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('Opening URL in new tab: http://example.com');
+    });
+
+    test('should throw error for invalid URL', async () => {
+      const args = { url: 'not-a-valid-url' };
+      
+      await expect(mcpServer.handleOpenUrl(args))
+        .rejects.toThrow('Invalid URL format');
+    });
+
+    test('should throw error for non-HTTP/HTTPS protocols', async () => {
+      const args = { url: 'ftp://example.com' };
+      
+      await expect(mcpServer.handleOpenUrl(args))
+        .rejects.toThrow('URL must use HTTP or HTTPS protocol');
+    });
+
+    test('should throw error for empty URL', async () => {
+      const args = { url: '' };
+      
+      await expect(mcpServer.handleOpenUrl(args))
+        .rejects.toThrow('URL must be a non-empty string');
+    });
+
+    test('should throw error for missing URL', async () => {
+      const args = {};
+      
+      await expect(mcpServer.handleOpenUrl(args))
+        .rejects.toThrow('URL must be a non-empty string');
+    });
+
+    test('should throw error for non-string URL', async () => {
+      const args = { url: 123 };
+      
+      await expect(mcpServer.handleOpenUrl(args))
+        .rejects.toThrow('URL must be a non-empty string');
+    });
+  });
+
   describe('setWebSocketHandler', () => {
     test('should set WebSocket handler correctly', () => {
       const newHandler = { test: true };
@@ -274,6 +332,18 @@ describe('McpServer', () => {
       expect(result.isError).toBeUndefined();
     });
 
+    test('should successfully call open_url tool', async () => {
+      const params = {
+        name: 'open_url',
+        arguments: { url: 'https://example.com' }
+      };
+      
+      const result = await mcpServer.handleToolCall(params);
+      
+      expect(result.content[0].text).toContain('Successfully opened URL in new tab');
+      expect(result.isError).toBeUndefined();
+    });
+
     test('should gracefully handle unknown tool names', async () => {
       const params = {
         name: 'invalid_tool',
@@ -284,7 +354,7 @@ describe('McpServer', () => {
       
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Unknown tool: "invalid_tool"');
-      expect(result.content[0].text).toContain('Available tools are: display_text, display_image, display_svg, display_image_url');
+      expect(result.content[0].text).toContain('Available tools are: display_text, display_image, display_svg, display_image_url, open_url');
       expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('Unknown tool requested: "invalid_tool"');
     });
 
@@ -312,7 +382,7 @@ describe('McpServer', () => {
       const result = await mcpServer.handleToolCall(params);
       
       expect(result.isError).toBe(true);
-      expect(consoleSpy).toHaveBeenCalledWith('Unknown tool requested: "nonexistent_tool". Available tools: display_text, display_image, display_svg, display_image_url');
+      expect(consoleSpy).toHaveBeenCalledWith('Unknown tool requested: "nonexistent_tool". Available tools: display_text, display_image, display_svg, display_image_url, open_url');
       
       // Ensure no error was logged (no stack trace)
       expect(jest.spyOn(console, 'error')).not.toHaveBeenCalled();
@@ -484,8 +554,8 @@ describe('McpServer', () => {
     test('should return all available tools', async () => {
       const result = await mcpServer.handleListTools();
       
-      expect(result.tools).toHaveLength(4);
-      expect(result.tools.map(t => t.name)).toEqual(['display_text', 'display_image', 'display_svg', 'display_image_url']);
+      expect(result.tools).toHaveLength(5);
+      expect(result.tools.map(t => t.name)).toEqual(['display_text', 'display_image', 'display_svg', 'display_image_url', 'open_url']);
       
       // Verify tool schemas
       result.tools.forEach(tool => {
@@ -498,7 +568,7 @@ describe('McpServer', () => {
         expect(tool.inputSchema.required.length).toBeGreaterThan(0);
         
         // Verify the correct property exists for each tool
-        if (tool.name === 'display_image_url') {
+        if (tool.name === 'display_image_url' || tool.name === 'open_url') {
           expect(tool.inputSchema.properties.url).toBeDefined();
           expect(tool.inputSchema.required).toContain('url');
         } else {

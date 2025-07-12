@@ -162,6 +162,9 @@ export default {
             if (data.type === 'content') {
               addContentItem(data.contentType, data.content, data.caption)
               addLogEntry(`Received ${data.contentType} content`)
+            } else if (data.type === 'openUrl') {
+              window.open(data.url, '_blank')
+              addLogEntry(`Opened URL in new tab: ${data.url}`)
             } else if (data.type === 'log') {
               addLogEntry(data.message)
             }

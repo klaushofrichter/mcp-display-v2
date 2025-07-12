@@ -175,5 +175,31 @@ describe('WebSocket Server', () => {
       expect(sentData.content).toBe('Hello World');
       expect(sentData.timestamp).toBeDefined();
     });
+
+    test('should send open_url messages correctly', () => {
+      const client = mockWsServer.addClient();
+      
+      handler.sendOpenUrl('https://example.com');
+      
+      const sentData = JSON.parse(client.lastSentData);
+      expect(sentData.type).toBe('openUrl');
+      expect(sentData.url).toBe('https://example.com');
+      expect(sentData.timestamp).toBeDefined();
+    });
+
+    test('should send open_url messages to all clients', () => {
+      const client1 = mockWsServer.addClient();
+      const client2 = mockWsServer.addClient();
+      
+      handler.sendOpenUrl('https://github.com');
+      
+      const sentData1 = JSON.parse(client1.lastSentData);
+      const sentData2 = JSON.parse(client2.lastSentData);
+      
+      expect(sentData1.type).toBe('openUrl');
+      expect(sentData1.url).toBe('https://github.com');
+      expect(sentData2.type).toBe('openUrl');
+      expect(sentData2.url).toBe('https://github.com');
+    });
   });
 }); 
