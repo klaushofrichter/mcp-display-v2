@@ -267,13 +267,7 @@ body {
   padding: 16px;
 }
 
-.url-notice {
-  font-size: 0.9rem;
-  color: #666;
-  font-style: italic;
-  margin-bottom: 8px;
-  text-align: center;
-}
+
 
 .url-link {
   display: inline-flex;

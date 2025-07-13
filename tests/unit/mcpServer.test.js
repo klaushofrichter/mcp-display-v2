@@ -261,7 +261,7 @@ describe('McpServer', () => {
       
       expect(result.content[0].text).toBe('Successfully opened URL in new tab: https://example.com');
       expect(mockWebSocketHandler.sendOpenUrl).toHaveBeenCalledWith('https://example.com');
-      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('url', 'https://example.com');
+      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('url', 'https://example.com', undefined);
       expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('Opening URL in new tab: https://example.com');
     });
 
@@ -272,7 +272,7 @@ describe('McpServer', () => {
       
       expect(result.content[0].text).toBe('Successfully opened URL in new tab: http://example.com');
       expect(mockWebSocketHandler.sendOpenUrl).toHaveBeenCalledWith('http://example.com');
-      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('url', 'http://example.com');
+      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('url', 'http://example.com', undefined);
       expect(mockWebSocketHandler.sendLog).toHaveBeenCalledWith('Opening URL in new tab: http://example.com');
     });
 
@@ -344,6 +344,58 @@ describe('McpServer', () => {
       
       expect(result.content[0].text).toContain('Successfully opened URL in new tab');
       expect(result.isError).toBeUndefined();
+    });
+
+    test('should successfully call open_url tool with caption', async () => {
+      const params = {
+        name: 'open_url',
+        arguments: { 
+          url: 'https://example.com/camera/live',
+          caption: 'Office Camera - Live View'
+        }
+      };
+      
+      const result = await mcpServer.handleToolCall(params);
+      
+      expect(result.content[0].text).toContain('Successfully opened URL in new tab');
+      expect(result.isError).toBeUndefined();
+      expect(mockWebSocketHandler.sendContent).toHaveBeenCalledWith('url', 'https://example.com/camera/live', 'Office Camera - Live View');
+    });
+
+    test('should handle open_url tool with invalid URL', async () => {
+      const params = {
+        name: 'open_url',
+        arguments: { url: 'invalid-url' }
+      };
+      
+      const result = await mcpServer.handleToolCall(params);
+      
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Invalid URL format');
+    });
+
+    test('should handle open_url tool with unsupported protocol', async () => {
+      const params = {
+        name: 'open_url',
+        arguments: { url: 'ftp://example.com/file.txt' }
+      };
+      
+      const result = await mcpServer.handleToolCall(params);
+      
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('URL must use HTTP or HTTPS protocol');
+    });
+
+    test('should handle open_url tool with empty URL', async () => {
+      const params = {
+        name: 'open_url',
+        arguments: { url: '' }
+      };
+      
+      const result = await mcpServer.handleToolCall(params);
+      
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('URL must be a non-empty string');
     });
 
     test('should gracefully handle unknown tool names', async () => {

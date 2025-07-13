@@ -655,6 +655,96 @@ Status: All systems operational`;
     await expect(urlLink).toBeFocused();
   });
 
+  test('should display open_url with caption correctly', async ({ page, request }) => {
+    // Use a test URL with a caption
+    const testUrl = 'https://example.com/camera/live';
+    const testCaption = 'Office Camera - Live View';
+    
+    // Make MCP request to open URL with caption
+    const customRequest = {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: {
+        name: 'open_url',
+        arguments: {
+          url: testUrl,
+          caption: testCaption
+        }
+      }
+    };
+    
+    const response = await request.post('http://localhost:3000/mcp', {
+      data: customRequest,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const result = await response.json();
+    
+    // Verify MCP response is successful
+    expect(result.result).toBeDefined();
+    expect(result.result.content[0].text).toContain(`Successfully opened URL in new tab: ${testUrl}`);
+    expect(result.result.isError).toBeUndefined();
+    
+    // Wait for content to appear
+    await expect(page.locator('.content-card')).toBeVisible({ timeout: 5000 });
+    
+    // Verify content type and structure
+    const contentItem = page.locator('.content-card').first();
+    await expect(contentItem.locator('.content-type')).toContainText('URL');
+    
+    // Verify the clickable URL link is displayed
+    const urlContent = contentItem.locator('.url-content');
+    await expect(urlContent).toBeVisible();
+    
+    const urlLink = urlContent.locator('.url-link');
+    await expect(urlLink).toBeVisible();
+    await expect(urlLink).toHaveAttribute('href', testUrl);
+    await expect(urlLink.locator('.url-text')).toContainText(testUrl);
+    
+    // Verify the caption is displayed underneath
+    const caption = urlContent.locator('.content-caption');
+    await expect(caption).toBeVisible();
+    await expect(caption).toContainText(testCaption);
+    
+    // Test with different caption
+    const testUrl2 = 'https://example.com/parking/camera';
+    const testCaption2 = 'Parking Lot Camera Feed';
+    
+    const customRequest2 = {
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/call',
+      params: {
+        name: 'open_url',
+        arguments: {
+          url: testUrl2,
+          caption: testCaption2
+        }
+      }
+    };
+    
+    await request.post('http://localhost:3000/mcp', {
+      data: customRequest2,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    // Wait for second content to appear
+    await expect(page.locator('.content-card')).toHaveCount(2);
+    
+    // Verify the second URL item with caption
+    const secondContentItem = page.locator('.content-card').nth(0); // First is the most recent
+    const secondUrlContent = secondContentItem.locator('.url-content');
+    const secondCaption = secondUrlContent.locator('.content-caption');
+    
+    await expect(secondCaption).toBeVisible();
+    await expect(secondCaption).toContainText(testCaption2);
+  });
+
   test('should display multiple content items in sequence', async ({ page, request }) => {
     // Get initial content count
     const initialContentCount = await page.locator('.content-card').count();

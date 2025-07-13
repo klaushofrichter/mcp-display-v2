@@ -51,7 +51,6 @@
                 <div v-if="item.caption" class="content-caption">{{ item.caption }}</div>
               </div>
               <div v-else-if="item.type === 'url'" class="url-content">
-                <div class="url-notice">Click the link below to open the URL:</div>
                 <a :href="item.content" target="_blank" rel="noopener noreferrer" class="url-link">
                   <span class="url-icon">🔗</span>
                   <span class="url-text">{{ item.content }}</span>

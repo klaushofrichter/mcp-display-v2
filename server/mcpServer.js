@@ -274,6 +274,10 @@ export class McpServer {
                 type: 'string',
                 description: 'URL to open in a new tab (must use HTTP or HTTPS protocol)',
               },
+              caption: {
+                type: 'string',
+                description: 'Optional caption to display underneath the URL link (e.g., camera name for live view)',
+              },
             },
             required: ['url'],
           },
@@ -508,7 +512,7 @@ export class McpServer {
   }
 
   async handleOpenUrl(args) {
-    const { url } = args;
+    const { url, caption } = args;
     
     if (!url || typeof url !== 'string') {
       throw new Error('URL must be a non-empty string');
@@ -530,7 +534,7 @@ export class McpServer {
     // Send URL to browser via WebSocket (both open and display)
     if (this.webSocketHandler) {
       this.webSocketHandler.sendOpenUrl(url);
-      this.webSocketHandler.sendContent('url', url);
+      this.webSocketHandler.sendContent('url', url, caption);
       this.webSocketHandler.sendLog(`Opening URL in new tab: ${url}`);
     }
 
@@ -710,7 +714,7 @@ export class McpServer {
             display_image: 'Display base64-encoded images',
             display_svg: 'Display SVG content',
             display_image_url: 'Display images from URLs',
-            open_url: 'Open URLs in new browser tabs and display clickable links',
+            open_url: 'Open URLs in new browser tabs and display clickable links (with optional caption)',
             display_html: 'Display HTML content with safe subset of tags',
           },
         },

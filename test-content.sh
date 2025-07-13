@@ -14,5 +14,5 @@ curl -X POST http://localhost:3000/mcp -H "Content-Type: application/json" -d '{
 
 echo ""
 echo "Displaying URL content..."
-curl -X POST http://localhost:3000/mcp -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"open_url","arguments":{"url":"https://github.com"}}}'
+curl -X POST http://localhost:3000/mcp -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"open_url","arguments":{"url":"https://github.com","caption":"GitHub - Code Repository Platform"}}}'
 
