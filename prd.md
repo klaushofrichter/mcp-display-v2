@@ -3,7 +3,7 @@
 ## Functionality
 * We create a local MCP server that supports HTTP transport
 * The server is locally run on MacOS
-* When launched, the MCP server offers a port where a browser can connect ca
+* When launched, the MCP server offers a port where a browser can connect to
 * The MCP server offers these tools to MCP clients:
   * Text display: the MCP client provides simple ASCII text that is then shown in a conected browser
   * Image display: the MCP client provides base64 encoded image data that is then shown in the connected browser. It is possible to provide an optional short string value that is shown as "caption" underneath the image display. 
