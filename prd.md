@@ -7,6 +7,7 @@
 * The MCP server offers these tools to MCP clients:
   * Text display: the MCP client provides simple ASCII text that is then shown in a conected browser
   * Image display: the MCP client provides base64 encoded image data that is then shown in the connected browser. It is possible to provide an optional short string value that is shown as "caption" underneath the image display. 
+  * HTML display: the MCP client provides HTML content to be rendered on the connected browser. We want to offer a limited set of supported HTML tags, including:   'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'em', 'b', 'i', 'u', 'ul', 'ol', 'li', 'br', 'a', 'div', 'span', 'table', 'tr', 'td', 'th', 'thead', 'tbody', 'img', 'blockquote', 'pre', 'code'
   * SVG display: the MCP client provides an SVG object that is shown in the connected browser. It is possible to provide an optional short string value that is shown as "caption" underneath the image display. 
   * Image URL display: the MCP client provides a URL to an image that is shown in the connected browser. It is possible to provide an optional short string value that is shown as "caption" underneath the image display. 
   * open_url - this receives a single string with a URL from the client. The dislpay is then opening another tab to navigate. Additionally, the content display shows a clickable link to the URL and a log entry is shown
